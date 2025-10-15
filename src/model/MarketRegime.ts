@@ -51,4 +51,6 @@ export interface MarketRegime {
   slots?: number;
   rebalance?: string;
   created_at?: string;
+  max_time?: number;
+  banned_months?: number[];   // <-- add this
 }
