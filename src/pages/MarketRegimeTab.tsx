@@ -5,7 +5,7 @@ import { Strategy } from "../model/Strategy.ts";
 import { fetchMarketRegimes, runBacktest, saveMarketRegime } from "../services/strategyService.ts";
 
 interface MarketRegimeTabProps {
-  strategy: Strategy; // ✅ full strategy instead of just id
+  strategy: Strategy; 
   onSave?: (strategy: Strategy, regimes: MarketRegime[]) => Promise<void>;
   onRunBacktest?: (strategy: Strategy, regimes: MarketRegime[]) => Promise<void>;
 }
@@ -95,25 +95,96 @@ useEffect(() => {
       },
     ]);
   };
+  const validateRegime = (r: MarketRegime) => {
+    const missing: string[] = [];
 
+    if (!r.entry_rules?.length) missing.push("Entry rules");
+    if (!r.exit_rules?.length) missing.push("Exit rules");
 
+    if (!r.entry_timing) missing.push("Entry timing");
+    if (!r.exit_timing) missing.push("Exit timing");
+
+    if (!r.order_type) missing.push("Order type");
+
+    if (!r.ranking) missing.push("Ranking indicator");
+    if (!r.ranking_lookback) missing.push("Ranking lookback");
+    if (!r.ranking_order) missing.push("Ranking order");
+
+    return missing;
+  };
+
+const allValid = regimes.every((r) => validateRegime(r).length === 0);
+
+// const handleSave = async () => {
+//   setLoading(true);
+//   setMessage("Saving strategy…");
+
+//   try {
+//     // Save each regime (create or update)
+//     for (const regime of regimes) {
+//         regime.strategy_id = strategy.id; // Ensure regime has the correct strategy_id
+
+//         for (const rule of regime.market_trend_rules || []) {
+//             if(rule.value_type !== "value") {
+//                 rule.value = 0; // or some other default
+//             }
+//         }
+
+//       const res = await saveMarketRegime(regime);
+//       if(!regime.id){
+//         regime.id = res.id; // update with returned id
+//       }
+//       console.log("saveMarketRegime response:", res);
+//       console.log("saved regime:", regime.id, "->", res);
+//     }
+//     setMessage("✅ Strategy & Regimes saved successfully");
+//   } catch (err) {
+//     console.error(err);
+//     setMessage("❌ Failed to save strategy");
+//   } finally {
+//     setLoading(false);
+//   }
+// };
 const handleSave = async () => {
   setLoading(true);
   setMessage("Saving strategy…");
 
   try {
-    // Save each regime (create or update)
-    for (const regime of regimes) {
-        regime.strategy_id = strategy.id; // Ensure regime has the correct strategy_id
-
-        for (const rule of regime.market_trend_rules || []) {
-            if(rule.value_type !== "value") {
-                rule.value = 0; // or some other default
-            }
-        }
-
-      await saveMarketRegime(regime);
+    // Validate all regimes first (simple + user-friendly)
+    for (let i = 0; i < regimes.length; i++) {
+      const missing = validateRegime(regimes[i]);
+      if (missing.length) {
+        setMessage(`❌ Regime ${i + 1}: missing ${missing.join(", ")}`);
+        setLoading(false);
+        return;
+      }
     }
+
+    const updatedRegimes: MarketRegime[] = [];
+
+    for (const regime of regimes) {
+      console.log(regime)
+      const payload: MarketRegime = {
+        ...regime,
+        strategy_id: strategy.id, // safe
+        market_trend_rules: (regime.market_trend_rules || []).map((rule) => ({
+          ...rule,
+          value: rule.value_type !== "value" ? 0 : rule.value, // normalize without mutating
+        })),
+      };
+
+      const res = await saveMarketRegime(payload);
+
+      console.log("saveMarketRegime response:", res);
+
+      // keep state in sync (especially id after create)
+      updatedRegimes.push({
+        ...regime,
+        id: regime.id ?? res.id,
+      });
+    }
+
+    setRegimes(updatedRegimes);
     setMessage("✅ Strategy & Regimes saved successfully");
   } catch (err) {
     console.error(err);
@@ -124,6 +195,15 @@ const handleSave = async () => {
 };
 
 
+const getFirstInvalid = () => {
+  for (let i = 0; i < regimes.length; i++) {
+    const missing = validateRegime(regimes[i]);
+    if (missing.length) return { index: i, missing };
+  }
+  return null;
+};
+
+const firstInvalid = getFirstInvalid();
 
 const handleRunBacktest = async () => {
   setLoading(true);
@@ -197,24 +277,42 @@ const handleRunBacktest = async () => {
         </div>
       )}
       {/* Action Buttons */}
-      <div className="flex justify-end gap-4 pt-6 border-t">
-        <button
-          type="button"
-          disabled={loading}
-          onClick={handleSave}
-          className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg shadow hover:bg-indigo-700 disabled:opacity-50"
-        >
-          {strategy.id ? "Update Strategy" : "Save Strategy"}
-        </button>
-        <button
-          type="button"
-          disabled={loading}
-          onClick={handleRunBacktest}
-          className="px-5 py-2 bg-green-600 text-white text-sm rounded-lg shadow hover:bg-green-700 disabled:opacity-50"
-        >
-          ▶ Run Backtest
-        </button>
+      <div className="pt-6 border-t">
+        {firstInvalid && (
+            <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <div className="font-semibold">
+                Regime {firstInvalid.index + 1} is missing:
+              </div>
+              <ul className="mt-1 list-disc pl-5">
+                {firstInvalid.missing.map((m) => (
+                  <li key={m}>{m}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+
+        <div className="flex justify-end gap-4">
+          <button
+            type="button"
+            disabled={loading || !allValid}
+            onClick={handleSave}
+            className="px-5 py-2 bg-indigo-600 text-white text-sm rounded-lg shadow hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {strategy.id ? "Update Strategy" : "Save Strategy"}
+          </button>
+
+          <button
+            type="button"
+            disabled={loading}
+            onClick={handleRunBacktest}
+            className="px-5 py-2 bg-green-600 text-white text-sm rounded-lg shadow hover:bg-green-700 disabled:opacity-50"
+          >
+            ▶ Run Backtest
+          </button>
+        </div>
       </div>
+
     </div>
   );
 };

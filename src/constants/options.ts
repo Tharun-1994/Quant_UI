@@ -19,11 +19,15 @@ export const INDICATORS: Record<string, string> = {
   atr: "Avg True Range",
   crsi: "CRSI",
   unadjusted_close: "Unadjusted Close Price",
-  relative_momentum: "Relative Momentum"
+  relative_momentum: "Relative Momentum",
+  average_volume: "Average Volume",
+  close: "Close Price",
+  n_week_high_recent: "N-Week High occurred within last X days",
 };
 
 export const MARKET_INDICATORS: Record<string, string> = {
   close: "Close Price",
+  sma: "SMA",
 };
 
 // Operators
@@ -33,6 +37,7 @@ export const OPERATORS: Record<string, string> = {
   ">": ">",
   ">=": ">=",
   "==": "==",
+  IS_TRUE: "is true",
 };
 
 // Connectors
@@ -117,6 +122,21 @@ export const INDICATOR_CONFIG: Record<
 > = {
   crsi: { lookback: 2 },             // auto-sets to 2            // example default
   unadjusted_close: { disableLookback: true }, // disables lookback
-
+  daily_close: { disableLookback: true },
 };
+
+export const INDICATOR_META: Record<string, any> = {
+  unadjusted_close: { hasLookback: false },
+  close: { hasLookback: false },
+  sma: { hasLookback: true },
+  n_week_high_recent: {
+      label: 'N-Week High occurred within last X days',
+      hasLookback: false,
+      kind: 'boolean',
+      params: [
+        { key: 'n_week_days', label: 'N-Week Window (days)', type: 'number', default: 252, min: 1 },
+        { key: 'within_days', label: 'Occurred within last (days)', type: 'number', default: 20, min: 1 },
+      ],
+    },
+  };
 

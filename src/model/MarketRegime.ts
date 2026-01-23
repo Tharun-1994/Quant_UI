@@ -8,8 +8,20 @@ export interface Rule {
   connector: string;
   label?: string;
   value_type?: string;
-  value_indicator?: string;
+  value_indicator: string;
+  value_lookback: number;
+
+  params?: Record<string, any>;
 }
+
+export type Logic = "AND" | "OR";
+
+export type RuleNode =
+  | { type: "rule"; id: string; rule: Rule }
+  | { type: "group"; id: string; logic: Logic; children: RuleNode[] };
+
+export type RuleTree = Extract<RuleNode, { type: "group" }>;
+
 // src/model/MarketRegime.ts
 export interface MarketRegime {
   id?: number;
@@ -53,4 +65,11 @@ export interface MarketRegime {
   created_at?: string;
   max_time?: number;
   banned_months?: number[];   // <-- add this
+  market_trend_rules_labels ?: string; 
+  volatility_rules_labels ?: string; 
+  entry_rules_labels ?: string; 
+  exit_rules_labels ?: string; 
+
+  entry_rules_tree ?: RuleTree;
+  exit_rules_tree ?: RuleTree;
 }

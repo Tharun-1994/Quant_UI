@@ -6,7 +6,7 @@ import {
   REBALANCE,
   SYSTEM_TYPE,
 } from "../constants/options.ts";
-import { createStrategy } from "../services/strategyService.ts";
+import { createStrategy,checkStrategyName } from "../services/strategyService.ts";
 
 interface StrategyFormProps {
   initialValues?: Partial<Strategy>;
@@ -39,6 +39,9 @@ const StrategyForm: React.FC<StrategyFormProps> = ({
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const [isTaken, setIsTaken] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+
   useEffect(() => {
     if (initialValues && Object.keys(initialValues).length > 0) {
       setForm((prev) => ({
@@ -47,6 +50,40 @@ const StrategyForm: React.FC<StrategyFormProps> = ({
       }));
     }
   }, [initialValues]);
+
+  useEffect(() => {
+  // 1. Don't check if the name is too short or empty
+  if (!form.name || form.name.length < 3) {
+    setIsTaken(false);
+    return;
+  }
+
+  // 2. Set up the debounce timer
+  const controller = new AbortController();
+  
+  const timeoutId = setTimeout(async () => {
+    setIsValidating(true);
+    try {
+      if(!form.id){
+        const data = await checkStrategyName(form.name, controller.signal);
+        setIsTaken(data.taken);
+      }
+      
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") {
+        console.error("Validation error:", err);
+      }
+    } finally {
+      setIsValidating(false);
+    }
+  }, 500); // Wait 500ms after last keystroke
+
+  // 3. Cleanup: This cancels the API call if user types again quickly
+  return () => {
+    clearTimeout(timeoutId);
+    controller.abort();
+  };
+}, [form.name]);
 
   const handleChange = (key: keyof Strategy, value: any) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -93,13 +130,27 @@ const StrategyForm: React.FC<StrategyFormProps> = ({
           {/* Strategy Name */}
           <div>
             <label className="block mb-1 font-medium">Strategy Name</label>
-            <input
-              type="text"
-              value={form.name}
-              onChange={(e) => handleChange("name", e.target.value)}
-              placeholder="e.g. Momentum V1"
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 focus:ring focus:ring-indigo-400"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={form.name}
+                onChange={(e) => handleChange("name", e.target.value)}
+                placeholder="e.g. Momentum V1"
+                className={`w-full px-3 py-2 rounded-lg border focus:ring ${
+                  isTaken ? "border-red-500 focus:ring-red-200" : "border-gray-300 focus:ring-indigo-400"
+                }`}
+              />
+              
+              {/* Show a small spinner or text while checking */}
+              {isValidating && (
+                <span className="absolute right-3 top-2 text-xs text-gray-400">Checking...</span>
+              )}
+            </div>
+
+            {/* Error Message */}
+            {isTaken && !isValidating && (
+              <p className="mt-1 text-sm text-red-600">This strategy name is already taken.</p>
+            )}
           </div>
 
           {/* Rebalance */}
@@ -211,6 +262,8 @@ const StrategyForm: React.FC<StrategyFormProps> = ({
               ))}
               </select>
             </div>
+
+            
 
       {/* ACTION BUTTONS */}
       <div className="flex justify-end gap-4">

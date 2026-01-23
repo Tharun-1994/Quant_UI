@@ -1,3 +1,4 @@
+import { GlobalFilter } from "./GlobalFilter";
 import { MarketRegime } from "./MarketRegime";
 
 
@@ -23,5 +24,7 @@ export interface Strategy {
   market_regime_type: string;
 
   regimes: MarketRegime[];
+
+  global_filter?: GlobalFilter[];
   
 }

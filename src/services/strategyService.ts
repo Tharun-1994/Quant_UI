@@ -24,6 +24,16 @@ export async function fetchStrategyById(id: number): Promise<Strategy> {
   return res.data;
 }
 
+// api/strategy.ts
+export async function checkStrategyName(name: string, signal?: AbortSignal) {
+  const params = new URLSearchParams({ name });
+  const res = await API.get(`/check-username?${params.toString()}`, { signal });
+
+  if (!res.status) throw new Error("Failed to check name");
+  return (await res.data) as { name: string; taken: boolean };
+}
+
+
 // Create new strategy
 export async function createStrategy(strategy: Strategy): Promise<StrategyResponse> {
   const { data } = await API.post<StrategyResponse>("/save-strategy", strategy);
@@ -42,7 +52,7 @@ export async function equityGraph(strategyId: number) {
 }
 
 export async function saveMarketRegime(marketRegime: MarketRegime) {
-  const { data } = await API.post("/save-marketregime", marketRegime);
+  const { data } = await API.post("/save-marketregime-v2", marketRegime);
   return data;
 }
 

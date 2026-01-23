@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import { Rule } from "../model/MarketRegime";
-import { INDICATORS, OPERATORS, CONNECTORS, INDICATOR_CONFIG, COMPARISON_TYPES, MARKET_INDICATORS, } from "../constants/options.ts";
+import { INDICATORS, OPERATORS, CONNECTORS, INDICATOR_CONFIG, COMPARISON_TYPES, MARKET_INDICATORS,INDICATOR_META } from "../constants/options.ts";
 
 interface Props {
   label: string;
@@ -9,6 +9,8 @@ interface Props {
 }
 
 const RulesEditor: React.FC<Props> = ({ label, rules, onChange }) => {
+
+
 
   useEffect(() => {
     const copy = [...rules];
@@ -45,7 +47,7 @@ const RulesEditor: React.FC<Props> = ({ label, rules, onChange }) => {
             className="bg-white border border-gray-200 rounded-lg shadow-sm p-4 grid grid-cols-1 sm:grid-cols-6 gap-4 items-end"
           >
             {/* Label */}
-            <div>
+            {/* <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">
                 Label
               </label>
@@ -60,7 +62,7 @@ const RulesEditor: React.FC<Props> = ({ label, rules, onChange }) => {
                 className="w-full border px-2 py-1 rounded focus:ring focus:ring-indigo-200"
                 placeholder="Name this rule"
               />
-            </div>
+            </div> */}
 
             {/* Indicator */}
             <div>
@@ -98,7 +100,8 @@ const RulesEditor: React.FC<Props> = ({ label, rules, onChange }) => {
 
 
             {/* Lookback */}
-            {rule.indicator !== "unadjusted_close" && (
+
+            {(INDICATOR_META[rule.indicator]?.hasLookback ?? true) && (
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">
                   Lookback
@@ -213,6 +216,30 @@ const RulesEditor: React.FC<Props> = ({ label, rules, onChange }) => {
             </div>
             )}
 
+
+
+            {/* Lookback value Lookback */}
+
+            {(rule.value_type !== "value" || rule.value <= 0) && (INDICATOR_META[rule.value_indicator]?.hasLookback ?? true) && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
+                  Lookback
+                </label>
+                <input
+                  type="number"
+                  value={rule.value_lookback}
+                  onChange={(e) => {
+                    const copy = [...rules];
+                    copy[idx].value_lookback = +e.target.value;
+                    onChange(copy);
+                  }}
+                  className="w-full border px-2 py-1 rounded focus:ring focus:ring-indigo-200"
+                  placeholder="e.g. 14"
+                />
+              </div>
+            )}
+
+
             {/* Connector + Remove */}
             <div className="flex items-end gap-2">
               <select
@@ -258,6 +285,9 @@ const RulesEditor: React.FC<Props> = ({ label, rules, onChange }) => {
               operator: "",
               value: 0,
               connector: "",
+              value_type: "",
+              value_lookback: 0,
+              value_indicator: "",
             },
           ])
         }
