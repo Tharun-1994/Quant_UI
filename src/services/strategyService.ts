@@ -6,7 +6,7 @@ import { MarketRegime } from "../model/MarketRegime.ts";
 import { StrategyResponse } from "../model/StrategyResponse.ts";
 
 const API = axios.create({
-  baseURL: "http://192.168.1.65:8001/api", // change to your FastAPI backend
+  baseURL: "http://192.168.1.66:8001/api", // change to your FastAPI backend
   headers: {
     "Content-Type": "application/json",
   },

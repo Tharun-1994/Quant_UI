@@ -98,17 +98,17 @@ useEffect(() => {
   const validateRegime = (r: MarketRegime) => {
     const missing: string[] = [];
 
-    if (!r.entry_rules?.length) missing.push("Entry rules");
-    if (!r.exit_rules?.length) missing.push("Exit rules");
+    // if (!r.entry_rules?.length) missing.push("Entry rules");
+    // if (!r.exit_rules?.length) missing.push("Exit rules");
 
     if (!r.entry_timing) missing.push("Entry timing");
     if (!r.exit_timing) missing.push("Exit timing");
 
     if (!r.order_type) missing.push("Order type");
 
-    if (!r.ranking) missing.push("Ranking indicator");
-    if (!r.ranking_lookback) missing.push("Ranking lookback");
-    if (!r.ranking_order) missing.push("Ranking order");
+    if (!r.ranking && r.regime_type != 'Individual ETFs - Simple') missing.push("Ranking indicator");
+    if (!r.ranking_lookback && r.regime_type != 'Individual ETFs - Simple') missing.push("Ranking lookback");
+    if (!r.ranking_order && r.regime_type != 'Individual ETFs - Simple') missing.push("Ranking order");
 
     return missing;
   };
@@ -259,7 +259,7 @@ const handleRunBacktest = async () => {
       </div>
 
       {/* Add Regime Button */}
-      {regimeType === "Simple" && (
+      { (regimeType === "Simple" || regimeType === "Individual ETFs - Simple") && (
         <div className="pt-6 border-t">
           <button
             type="button"

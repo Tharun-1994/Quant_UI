@@ -10,6 +10,12 @@ export const UNIVERSES_CODES: Record<string, string> = {
   "Liquid 500": "liquid500",
 };
 
+
+export const INDIVIDUAL_ETFS = [
+  { key: "SPY", label: "SPY" },
+  { key: "GLD", label: "Gold (GLD)" }, // “Gold” as ETF
+];
+
 // Indicators
 export const INDICATORS: Record<string, string> = {
   rsi: "RSI",
@@ -23,6 +29,7 @@ export const INDICATORS: Record<string, string> = {
   average_volume: "Average Volume",
   close: "Close Price",
   n_week_high_recent: "N-Week High occurred within last X days",
+  'vix_close': "VIX Close Price",
 };
 
 export const MARKET_INDICATORS: Record<string, string> = {
@@ -99,6 +106,7 @@ export const TAKEPROFIT_TYPE: Record<string, string> = {
 
 // market regime Type
 export const MARKET_REGIME_TYPE: Record<string, string> = {
+  individual_etfs_simple: "Individual ETFs - Simple",
   normal: "Normal",
   simple: "Simple",
   complex: "Complex",
@@ -129,6 +137,7 @@ export const INDICATOR_META: Record<string, any> = {
   unadjusted_close: { hasLookback: false },
   close: { hasLookback: false },
   sma: { hasLookback: true },
+  vix_close: { hasLookback: false },
   n_week_high_recent: {
       label: 'N-Week High occurred within last X days',
       hasLookback: false,

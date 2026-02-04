@@ -72,4 +72,10 @@ export interface MarketRegime {
 
   entry_rules_tree ?: RuleTree;
   exit_rules_tree ?: RuleTree;
+
+  freeze_rules_tree ?: RuleTree;
+  resume_rules_tree ?: RuleTree;
+
+  market_trend_rules_tree ?: RuleTree;
+
 }

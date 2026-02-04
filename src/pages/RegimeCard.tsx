@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { use, useEffect, useMemo, useRef, useState } from "react";
 import { MarketRegime, RuleTree } from "../model/MarketRegime";
 import {
   INDEX_TICKERS,
@@ -11,6 +11,7 @@ import {
   UNIVERSES,
   SIGNAL_TIMING,
   REBALANCE,
+  INDIVIDUAL_ETFS,
 } from "../constants/options.ts";
 import RulesEditor from "../pages/RulesEditor.tsx";
 import RulesTreeEditor from "../pages/RuleTreeEditor.tsx";
@@ -32,12 +33,76 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
     logic: "AND",
     children: [], // ✅ empty allowed
   });
+
+
+
+
   const [entryTree, setEntryTree] = useState<RuleTree>(() => regime.entry_rules_tree ?? makeEmptyTree());
   const [exitTree, setExitTree] = useState<RuleTree>(() => regime.exit_rules_tree ?? makeEmptyTree());
+
+  const [freezeRulesTree, setFreezeRulesTree] = useState<RuleTree>(() => (regime as any).freeze_rules_tree ?? makeEmptyTree());
+  const [resumeRulesTree, setResumeRulesTree] = useState<RuleTree>(() => (regime as any).resume_rules_tree ?? makeEmptyTree());
+  const [useFreezeUnFreezeCheck, setUseFreezeUnFreezeCheck] = useState<boolean>(() => (regime as any).freeze_rules_tree ?? false);
+
+  const isIndividualEtfSimple = (regime.regime_type === "Individual ETFs - Simple");
+  const [marketTrendRulesTree, setMarketTrendRulesTree] = useState<RuleTree>(() => (regime as any).market_trend_rules_tree ?? makeEmptyTree());
+
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+
+  const selectedEtfs = useMemo(() => {
+    if (!isIndividualEtfSimple) return [];
+    const raw = (regime.universe || "").trim();
+    if (!raw) return [];
+    return raw.split(",").map((s) => s.trim()).filter(Boolean);
+  }, [isIndividualEtfSimple, regime.universe]);
+
+  const toggleEtf = (ticker: string) => {
+    const next = selectedEtfs.includes(ticker)
+      ? selectedEtfs.filter((x) => x !== ticker)
+      : [...selectedEtfs, ticker];
+
+    onUpdate({ ...regime, universe: next.join(",") }); // ✅ still string
+  };
+
+  // UI state
+  const [openEtfDropdown, setOpenEtfDropdown] = useState(false);
+  const etfRef = useRef<HTMLDivElement | null>(null);
+
+  // close when click outside
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (!etfRef.current) return;
+      if (!etfRef.current.contains(e.target as Node)) setOpenEtfDropdown(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+
+
 
   useEffect(() => {
     setEntryTree(regime.entry_rules_tree ?? makeEmptyTree());
     setExitTree(regime.exit_rules_tree ?? makeEmptyTree());
+    setFreezeRulesTree(regime.freeze_rules_tree ?? makeEmptyTree());
+    setResumeRulesTree(regime.resume_rules_tree ?? makeEmptyTree());
+    setMarketTrendRulesTree(regime.market_trend_rules_tree ?? makeEmptyTree());
+
+
   }, [regime.id]);
 
   useEffect(() => {
@@ -50,6 +115,35 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exitTree]);
 
+  useEffect(() => {
+    onUpdate({ ...regime, freeze_rules_tree: freezeRulesTree });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [freezeRulesTree]);
+
+  useEffect(() => {
+    onUpdate({ ...regime, resume_rules_tree: resumeRulesTree });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeRulesTree]);
+
+
+  useEffect(() => {
+    onUpdate({ ...regime, market_trend_rules_tree: marketTrendRulesTree });
+  }, [marketTrendRulesTree]);
+
+  useEffect(() => {
+    onUpdate({ ...regime, exit_rules_tree: exitTree });
+  }, [regime.id]);
+
+  // useEffect(() => {
+  //   onUpdate({ ...(regime as any), use_volatility_tree: useVolatilityTree });
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [useVolatilityTree]);
+
+  // useEffect(() => {
+  //   onUpdate({ ...(regime as any), volatility_rules_tree: volatilityTree });
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [volatilityTree]);
+
   return (
     <div className="bg-white shadow-lg rounded-2xl border border-gray-300 p-6 space-y-8 hover:shadow-xl transition">
       {/* Header */}
@@ -58,7 +152,7 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
           {regime.market_trend_type || regime.regime_type}
         </h3>
 
-        {(regime.regime_type === "Simple" || regime.regime_type === "Complex") && (
+        {/* {(regime.regime_type === "Simple" || regime.regime_type === "Complex" || regime.regime_type === "Individual ETFs - Simple") && (
           <div className="flex flex-col">
             <label className="block text-sm font-bold text-gray-700 mb-2">
               Market Trend Ticker
@@ -77,7 +171,7 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
               ))}
             </select>
           </div>
-        )}
+        )} */}
 
       </div>
 
@@ -92,19 +186,63 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
             <label className="block text-sm font-bold text-gray-700 mb-2">
               Universe<span className="text-red-600">*</span>
             </label>
-            <select
-              value={regime.universe || ""}
-              onChange={(e) => onUpdate({ ...regime, universe: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-blue-200"
-            >
-              <option value="">-- Select Universe --</option>
-              {Object.entries(UNIVERSES).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
 
+            {isIndividualEtfSimple ? (
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(!isOpen)}
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-left text-sm shadow-sm hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-700">
+                      {selectedEtfs.length > 0
+                        ? selectedEtfs.map(key =>
+                          INDIVIDUAL_ETFS.find(etf => etf.key === key)?.label
+                        ).join(", ")
+                        : "Select ETFs..."}
+                    </span>
+                    <svg className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </button>
+
+                {isOpen && (
+                  <div className="absolute z-10 mt-1 w-full rounded-md border border-gray-300 bg-white shadow-lg">
+                    <div className="py-1">
+                      {INDIVIDUAL_ETFS.map((etf) => (
+                        <label
+                          key={etf.key}
+                          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            checked={selectedEtfs.includes(etf.key)}
+                            onChange={() => toggleEtf(etf.key)}
+                          />
+                          {etf.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <select
+                value={regime.universe || ""}
+                onChange={(e) => onUpdate({ ...regime, universe: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-blue-200"
+              >
+                <option value="">-- Select Universe --</option>
+                {Object.entries(UNIVERSES).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           {/* Capital */}
@@ -136,6 +274,7 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
             />
           </div>
 
+
           {/* <div>
       <label className="block text-sm font-bold text-gray-700 mb-2">
         Rebalance
@@ -156,40 +295,118 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
         </div>
       </div>
 
-
-      {/* Rules Sections */}
-      <div className="space-y-6">
-        {(regime.regime_type === "Simple" ||
-          regime.regime_type === "Complex") && (
-            <div className="bg-indigo-50 rounded-lg p-4">
-              <h4 className="text-lg font-bold text-indigo-800 mb-3">
-                📈 Market Trend Rules{" "}
-                {regime.market_trend_type ? `(${regime.market_trend_type})` : ""}
-              </h4>
-              <RulesEditor
-                label=""
-                rules={regime.market_trend_rules || []}
-                onChange={(rules) =>
-                  onUpdate({ ...regime, market_trend_rules: rules })
-                }
-              />
-            </div>
-          )}
-
-        {regime.regime_type === "Complex" && (
-          <div className="bg-yellow-50 rounded-lg p-4">
-            <h4 className="text-lg font-bold text-yellow-800 mb-3">
-              ⚡ Volatility Rules
+      {(regime.regime_type === "Simple" ||
+        regime.regime_type === "Complex" || regime.regime_type === "Individual ETFs - Simple") && (
+          <div className="bg-indigo-50 rounded-lg p-4">
+            <h4 className="text-lg font-bold text-indigo-800 mb-3">
+              {regime.market_trend_type ? `(${regime.market_trend_type})` : ""}
             </h4>
-            <RulesEditor
-              label=""
-              rules={regime.volatility_rules || []}
-              onChange={(rules) =>
-                onUpdate({ ...regime, volatility_rules: rules })
-              }
+            <RulesTreeEditor
+              key="market-rules-editor"
+              label=" 📈 Market Trend Rules"
+              tree={marketTrendRulesTree}
+              onChange={setMarketTrendRulesTree}
             />
           </div>
         )}
+
+      <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h4 className="text-lg font-bold text-yellow-800">
+              ⚡ Volatility Cut Rules
+            </h4>
+            <p className="text-sm text-yellow-900/70 mt-1">
+              Turn on to cut trades during volatility conditions and resume when conditions clear.
+            </p>
+          </div>
+
+          {/* Switch */}
+          <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={useFreezeUnFreezeCheck}
+              onChange={(e) => setUseFreezeUnFreezeCheck(e.target.checked)}
+              className="h-5 w-5 rounded border-gray-300 text-yellow-600 focus:ring-yellow-300"
+            />
+            <span className="text-sm font-semibold text-yellow-900">
+              {useFreezeUnFreezeCheck ? "ON" : "OFF"}
+            </span>
+          </label>
+        </div>
+
+        {/* Editor */}
+        {useFreezeUnFreezeCheck ? (
+          <div className="mt-4">
+            <RulesTreeEditor
+              key="freeze-rules-editor"
+              label="Freeze Trading Rules"
+              tree={freezeRulesTree}
+              onChange={setFreezeRulesTree}
+            />
+
+            <RulesTreeEditor
+              key="unfreeze-rules-editor"
+              label="Resume Trading Rules"
+              tree={resumeRulesTree}
+              onChange={setResumeRulesTree}
+            />
+          </div>
+        ) : (
+          <div className="mt-4 rounded-lg border border-yellow-200 bg-white px-3 py-2 text-sm text-gray-700">
+            Volatility cut rules are disabled. The strategy will trade normally.
+          </div>
+        )}
+      </div>
+
+      {/* Rules Sections */}
+      <div className="space-y-6">
+
+
+        {regime.regime_type === "Complex" && (
+          <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h4 className="text-lg font-bold text-yellow-800">
+                  ⚡ Volatility Cut Rules
+                </h4>
+                <p className="text-sm text-yellow-900/70 mt-1">
+                  Turn on to cut trades during volatility conditions and resume when conditions clear.
+                </p>
+              </div>
+
+              {/* Switch */}
+              {/* <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={useVolatilityTree}
+                onChange={(e) => setUseVolatilityTree(e.target.checked)}
+                className="h-5 w-5 rounded border-gray-300 text-yellow-600 focus:ring-yellow-300"
+              />
+              <span className="text-sm font-semibold text-yellow-900">
+                {useVolatilityTree ? "ON" : "OFF"}
+              </span>
+            </label> */}
+            </div>
+
+            {/* Editor */}
+            {/* {useVolatilityTree ? (
+            <div className="mt-4">
+              <RulesTreeEditor
+                key="volatility-editor"
+                label="⚡ Volatility Cut Rules"
+                tree={volatilityTree}
+                onChange={setVolatilityTree}
+              />
+            </div>
+          ) : (
+            <div className="mt-4 rounded-lg border border-yellow-200 bg-white px-3 py-2 text-sm text-gray-700">
+              Volatility cut rules are disabled. The strategy will trade normally.
+            </div>
+          )} */}
+          </div>
+        )}
+
 
         <div className="bg-green-50 rounded-lg p-4">
           {/* <h4 className="text-lg font-bold text-green-800 mb-3">✅ Entry Rules<span className="text-red-600">*</span></h4>  */}
