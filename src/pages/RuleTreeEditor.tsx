@@ -596,6 +596,20 @@ function RuleRow({
                 />
             </div>
             )}
+            {/* Compare To Range % */}
+            {valueType === "indicator_price" && (INDICATOR_META[rule.value_indicator]?.hasRange ?? false) && (
+            <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Range %</label>
+                <input
+                type="number"
+                value={rule.value_range_percent}
+                onChange={(e) => onChange({ ...rule, value_range_percent: +e.target.value })}
+                className="w-full border px-2 py-1 rounded focus:ring focus:ring-indigo-200"
+                />
+            </div>
+            )}
+
+
         </>
         ) : (
         // ✅ Boolean indicator UI (simple)

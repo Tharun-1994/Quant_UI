@@ -10,7 +10,7 @@ export interface Rule {
   value_type?: string;
   value_indicator: string;
   value_lookback: number;
-
+  value_range_percent?: number;
   params?: Record<string, any>;
 }
 
@@ -44,7 +44,12 @@ export interface MarketRegime {
 
   takeprofit_type?: string;
   stoploss_pct?: number;
+  stoploss_dollar?: number;
+
+
   takeprofit_pct?: number;
+  takeprofit_dollar?:number;
+
   stoploss_timing?: string;
   takeprofit_timing?: string;
   atr_lookback_stp?: number;

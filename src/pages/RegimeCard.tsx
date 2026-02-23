@@ -42,7 +42,7 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
 
   const [freezeRulesTree, setFreezeRulesTree] = useState<RuleTree>(() => (regime as any).freeze_rules_tree ?? makeEmptyTree());
   const [resumeRulesTree, setResumeRulesTree] = useState<RuleTree>(() => (regime as any).resume_rules_tree ?? makeEmptyTree());
-  const [useFreezeUnFreezeCheck, setUseFreezeUnFreezeCheck] = useState<boolean>(() => (regime as any).freeze_rules_tree ?? false);
+  const [useFreezeUnFreezeCheck, setUseFreezeUnFreezeCheck] = useState<boolean>(() => ((regime as any).freeze_rules_tree?.children?.length ?? 0) > 0);
 
   const isIndividualEtfSimple = (regime.regime_type === "Individual ETFs - Simple");
   const [marketTrendRulesTree, setMarketTrendRulesTree] = useState<RuleTree>(() => (regime as any).market_trend_rules_tree ?? makeEmptyTree());
@@ -521,22 +521,8 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
           {/* Stoploss Section */}
           <div className="bg-gray-50 p-4 rounded-lg border">
             <h5 className="font-bold text-gray-900 mb-3">Stoploss</h5>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Stoploss %
-                </label>
-                <input
-                  type="number"
-                  value={regime.stoploss_pct || ""}
-                  onChange={(e) =>
-                    onUpdate({ ...regime, stoploss_pct: +e.target.value })
-                  }
-                  className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-red-200"
-                  placeholder="e.g. 5"
-                />
-              </div>
 
+            
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
                   Stoploss Type
@@ -556,6 +542,42 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
                   ))}
                 </select>
               </div>
+
+          
+            <div className="space-y-3">
+              {regime.stoploss_type !== "DOLLAR_BASED" && ( 
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Stoploss %
+                </label>
+                <input
+                  type="number"
+                  value={regime.stoploss_pct || ""}
+                  onChange={(e) =>
+                    onUpdate({ ...regime, stoploss_pct: +e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-red-200"
+                  placeholder="e.g. 5"
+                />
+              </div>
+            )}
+
+            {regime.stoploss_type === "DOLLAR_BASED" && ( 
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Stoploss Dollar
+                </label>
+                <input
+                  type="number"
+                  value={regime.stoploss_dollar || ""}
+                  onChange={(e) =>
+                    onUpdate({ ...regime, stoploss_dollar: +e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-red-200"
+                  placeholder="e.g. 5"
+                />
+              </div>
+            )}
 
               {regime.stoploss_type === "ATR_BASED" && (
                 <div>
@@ -601,22 +623,6 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
           {/* Takeprofit Section */}
           <div className="bg-gray-50 p-4 rounded-lg border">
             <h5 className="font-bold text-gray-900 mb-3">Takeprofit</h5>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Takeprofit %
-                </label>
-                <input
-                  type="number"
-                  value={regime.takeprofit_pct || ""}
-                  onChange={(e) =>
-                    onUpdate({ ...regime, takeprofit_pct: +e.target.value })
-                  }
-                  className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-green-200"
-                  placeholder="e.g. 15"
-                />
-              </div>
-
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
                   Takeprofit Type
@@ -636,6 +642,42 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
                   ))}
                 </select>
               </div>
+          
+            <div className="space-y-3">
+            {regime.takeprofit_type !== "DOLLAR_BASED" && (
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Takeprofit %
+                </label>
+                <input
+                  type="number"
+                  value={regime.takeprofit_pct || ""}
+                  onChange={(e) =>
+                    onUpdate({ ...regime, takeprofit_pct: +e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-green-200"
+                  placeholder="e.g. 15"
+                />
+              </div>
+            )}
+
+            {regime.takeprofit_type == "DOLLAR_BASED" && (
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Takeprofit Dollar Amount
+                </label>
+                <input
+                  type="number"
+                  value={regime.takeprofit_dollar || ""}
+                  onChange={(e) =>
+                    onUpdate({ ...regime, takeprofit_dollar: +e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-green-200"
+                  placeholder="e.g. 15"
+                />
+              </div>
+            )}
+
 
               {regime.takeprofit_type === "ATR_BASED" && (
                 <div>
@@ -755,6 +797,7 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
           </div>
 
           {/* Ranking Section */}
+          {( regime.regime_type !== "Individual ETFs - Simple") && (
           <div className="bg-gray-50 p-4 rounded-lg border">
             <h5 className="font-bold text-gray-900 mb-3">Ranking</h5>
             <div className="space-y-3">
@@ -814,7 +857,7 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
               </div>
             </div>
           </div>
-
+            )}
           {/* Banned Months Section */}
           <div className="bg-gray-50 p-4 rounded-lg border">
             <h5 className="font-bold text-gray-900 mb-3">Banned Months</h5>
@@ -855,13 +898,6 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
 
         </div>
       </div>
-
-
-
-
-
-
-
     </div>
   );
 };

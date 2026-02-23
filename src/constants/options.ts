@@ -35,6 +35,8 @@ export const INDICATORS: Record<string, string> = {
 export const MARKET_INDICATORS: Record<string, string> = {
   close: "Close Price",
   sma: "SMA",
+  atr: "Avg True Range",
+  range_close: "Range Close",
 };
 
 // Operators
@@ -62,9 +64,11 @@ export const REBALANCE: Record<string, string> = {
 
 // Signal Timing
 export const SIGNAL_TIMING: Record<string, string> = {
-  open: "Next Day Morning",
-  // close: "Today Close",
+  open: "Next bar Open",
+  close: "This Bar Close",
 };
+
+
 
 // Risk Timing
 export const RISK_TIMING: Record<string, string> = {
@@ -95,12 +99,14 @@ export const ORDER_TYPE: Record<string, string> = {
 export const STOPLOSS_TYPE: Record<string, string> = {
   nrml: "NORMAL",
   atr_based: "ATR_BASED",
+  dollar_based: "DOLLAR_BASED",
 };
 
 // Takeprofit Type
 export const TAKEPROFIT_TYPE: Record<string, string> = {
   nrml: "NORMAL",
   atr_based: "ATR_BASED",
+  dollar_based: "DOLLAR_BASED",
 };
 
 
@@ -138,6 +144,8 @@ export const INDICATOR_META: Record<string, any> = {
   close: { hasLookback: false },
   sma: { hasLookback: true },
   vix_close: { hasLookback: false },
+  range_close: { hasLookback: false, hasRange: true },
+
   n_week_high_recent: {
       label: 'N-Week High occurred within last X days',
       hasLookback: false,
