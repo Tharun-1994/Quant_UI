@@ -8,6 +8,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Strategy } from "../model/Strategy.ts";
 import { fetchStrategyById } from "../services/strategyService.ts";
 import MarketRegimeTab from "./MarketRegimeTab.tsx";
+import DownloadTab from "./DownloadTab.tsx";
 
 
 interface StrategyDetailProps {
@@ -15,7 +16,7 @@ interface StrategyDetailProps {
 }
 
 const StrategyDetail: React.FC<StrategyDetailProps> = ({ mode }) => {
-  const [tab, setTab] = useState<"overview" | "marketRegime"| "equity" | "performance" | "upload">("overview");
+  const [tab, setTab] = useState<"overview" | "marketRegime"| "equity" | "performance" | "upload" | "download">("overview");
     const navigate = useNavigate();
   const { id } = useParams();
   const [strategy, setStrategy] = useState<Strategy | null>(null);
@@ -54,7 +55,7 @@ const StrategyDetail: React.FC<StrategyDetailProps> = ({ mode }) => {
 
       {/* Tabs */}
       <nav className="flex space-x-4 border-b pb-2 mb-4">
-        {["overview","marketRegime", "equity", "performance", "upload"].map((key) => (
+        {["overview","marketRegime", "equity", "performance", "upload", "download"].map((key) => (
           <button
             key={key}
             onClick={() => setTab(key as any)}
@@ -74,7 +75,13 @@ const StrategyDetail: React.FC<StrategyDetailProps> = ({ mode }) => {
 )}
       {tab === "equity" && <EquityTab strategyId={id != null ? Number(id) : 0} />}
       {tab === "performance" && <PerformanceTab strategyId={id != null ? Number(id) : 0} />}
-      {tab === "upload" && <UploadTab />}
+      {/* {tab === "upload" && <UploadTab />} */}
+      {tab === "download" && strategy && (
+        <DownloadTab
+          strategyId={strategy.id ?? 0}
+          systemName={strategy.name ?? ""}
+        />
+      )}
     </div>
   );
 };

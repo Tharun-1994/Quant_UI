@@ -87,6 +87,26 @@ export async function deleteStrategy(id: number): Promise<void> {
   await API.delete(`/strategies/${id}`);
 }
 
+
+// Download tradelist CSV
+export async function downloadTradelist(strategyId: number, systemName: string): Promise<Blob> {
+  const { data } = await API.get(`/${strategyId}/download/tradelist`, {
+    params: { system_name: systemName },
+    responseType: "blob",
+  });
+  return data;
+}
+
+// Download equity CSV
+export async function downloadEquity(strategyId: number, systemName: string): Promise<Blob> {
+  const { data } = await API.get(`/${strategyId}/download/equity`, {
+    params: { system_name: systemName },
+    responseType: "blob",
+  });
+  return data;
+}
+
+
 export async function saveStrategy():Promise<void>{
 
 }
