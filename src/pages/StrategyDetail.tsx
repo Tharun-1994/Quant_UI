@@ -55,7 +55,7 @@ const StrategyDetail: React.FC<StrategyDetailProps> = ({ mode }) => {
 
       {/* Tabs */}
       <nav className="flex space-x-4 border-b pb-2 mb-4">
-        {["overview","marketRegime", "equity", "performance", "upload", "download"].map((key) => (
+        {["overview","marketRegime", "equity", "performance", "download"].map((key) => (
           <button
             key={key}
             onClick={() => setTab(key as any)}
