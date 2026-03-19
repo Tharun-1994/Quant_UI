@@ -111,3 +111,31 @@ export async function saveStrategy():Promise<void>{
 
 }
 
+export interface InputFile {
+  filename: string;
+  name: string;
+  category: "prices" | "dates" | "universe" | "indicator";
+  size_kb: number;
+}
+
+// List all input parquet files for a strategy
+export async function fetchInputFiles(strategyId: number, systemName: string): Promise<InputFile[]> {
+  const { data } = await API.get<InputFile[]>(`/${strategyId}/input-files`, {
+    params: { system_name: systemName },
+  });
+  return data;
+}
+
+// Download a single input file as CSV
+export async function downloadInputFile(
+  strategyId: number,
+  systemName: string,
+  filename: string
+): Promise<Blob> {
+  const { data } = await API.get(`/${strategyId}/download-input/${filename}`, {
+    params: { system_name: systemName },
+    responseType: "blob",
+  });
+  return data;
+}
+
