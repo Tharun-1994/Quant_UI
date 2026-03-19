@@ -83,4 +83,5 @@ export interface MarketRegime {
 
   market_trend_rules_tree ?: RuleTree;
 
+  is_look_inside_bar?: boolean;
 }

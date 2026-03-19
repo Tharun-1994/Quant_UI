@@ -15,6 +15,7 @@ import {
 } from "../constants/options.ts";
 import RulesEditor from "../pages/RulesEditor.tsx";
 import RulesTreeEditor from "../pages/RuleTreeEditor.tsx";
+import { getRegimeConfig } from "../config/regimeConfig.ts";
 
 
 
@@ -45,6 +46,9 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
   const [useFreezeUnFreezeCheck, setUseFreezeUnFreezeCheck] = useState<boolean>(() => ((regime as any).freeze_rules_tree?.children?.length ?? 0) > 0);
 
   const isIndividualEtfSimple = (regime.regime_type === "Individual ETFs - Simple");
+
+  // ── Config-driven isolation: ETF vs Equity ──
+  const config = getRegimeConfig(regime.regime_type);
   const [marketTrendRulesTree, setMarketTrendRulesTree] = useState<RuleTree>(() => (regime as any).market_trend_rules_tree ?? makeEmptyTree());
 
   const [isOpen, setIsOpen] = useState(false);
@@ -295,8 +299,7 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
         </div>
       </div>
 
-      {(regime.regime_type === "Simple" ||
-        regime.regime_type === "Complex" || regime.regime_type === "Individual ETFs - Simple") && (
+      {config.features.marketTrendRules && (
           <div className="bg-indigo-50 rounded-lg p-4">
             <h4 className="text-lg font-bold text-indigo-800 mb-3">
               {regime.market_trend_type ? `(${regime.market_trend_type})` : ""}
@@ -306,6 +309,8 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
               label=" 📈 Market Trend Rules"
               tree={marketTrendRulesTree}
               onChange={setMarketTrendRulesTree}
+              indicators={config.indicators.marketTrend}
+              marketIndicators={config.indicators.marketTrend}
             />
           </div>
         )}
@@ -343,6 +348,8 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
               label="Freeze Trading Rules"
               tree={freezeRulesTree}
               onChange={setFreezeRulesTree}
+              indicators={config.indicators.freeze}
+              marketIndicators={config.indicators.freeze}
             />
 
             <RulesTreeEditor
@@ -350,6 +357,8 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
               label="Resume Trading Rules"
               tree={resumeRulesTree}
               onChange={setResumeRulesTree}
+              indicators={config.indicators.freeze}
+              marketIndicators={config.indicators.freeze}
             />
           </div>
         ) : (
@@ -363,7 +372,7 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
       <div className="space-y-6">
 
 
-        {regime.regime_type === "Complex" && (
+        {config.features.volatilityRules && (
           <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -397,6 +406,8 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
                 label="⚡ Volatility Cut Rules"
                 tree={volatilityTree}
                 onChange={setVolatilityTree}
+                indicators={config.indicators.freeze}
+                marketIndicators={config.indicators.freeze}
               />
             </div>
           ) : (
@@ -422,6 +433,8 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
             label="✅ Entry Rules"
             tree={entryTree}
             onChange={setEntryTree}
+            indicators={config.indicators.entry}
+            marketIndicators={config.indicators.valueIndicators}
           />
 
 
@@ -451,6 +464,8 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
             label="❌ Exit Rules"
             tree={exitTree}
             onChange={setExitTree}
+            indicators={config.indicators.entry}
+            marketIndicators={config.indicators.valueIndicators}
           />
 
           {/* Summary */}
@@ -517,6 +532,28 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
         <h4 className="text-lg font-bold text-gray-800 mb-4">
           🎯 Risk & Portfolio Parameters
         </h4>
+
+        {/* Look Inside Bar toggle — ETF only */}
+        {config.features.lookInsideBar && (
+        <label className="inline-flex items-center gap-3 mb-4 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={regime.is_look_inside_bar || false}
+            onChange={(e) =>
+              onUpdate({ ...regime, is_look_inside_bar: e.target.checked })
+            }
+            className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-300"
+          />
+          <div>
+            <span className="text-sm font-bold text-gray-700">Look Inside Bar</span>
+            <p className="text-xs text-gray-500">
+              When enabled, stoploss and takeprofit are evaluated on minute-bar data.
+              When disabled, they use daily bar data only.
+            </p>
+          </div>
+        </label>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {/* Stoploss Section */}
           <div className="bg-gray-50 p-4 rounded-lg border">
@@ -610,7 +647,9 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
                   className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-indigo-200"
                 >
                   <option value="">-- Select --</option>
-                  {Object.entries(RISK_TIMING).map(([key, label]) => (
+                  {Object.entries(RISK_TIMING)
+                    .filter(([key]) => config.features.intradayTiming || key !== "intraday")
+                    .map(([key, label]) => (
                     <option key={key} value={label}>
                       {label}
                     </option>
@@ -710,7 +749,9 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
                   className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-indigo-200"
                 >
                   <option value="">-- Select --</option>
-                  {Object.entries(RISK_TIMING).map(([key, label]) => (
+                  {Object.entries(RISK_TIMING)
+                    .filter(([key]) => config.features.intradayTiming || key !== "intraday")
+                    .map(([key, label]) => (
                     <option key={key} value={label}>
                       {label}
                     </option>
@@ -797,7 +838,7 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
           </div>
 
           {/* Ranking Section */}
-          {( regime.regime_type !== "Individual ETFs - Simple") && (
+          {config.features.ranking && (
           <div className="bg-gray-50 p-4 rounded-lg border">
             <h5 className="font-bold text-gray-900 mb-3">Ranking</h5>
             <div className="space-y-3">

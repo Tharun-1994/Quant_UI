@@ -108,9 +108,16 @@ type Props = {
   tree?: RuleTree; // allow undefined so we can bootstrap
   onChange: (tree: RuleTree) => void;
   showPreview?: boolean;
+  /** Override entry/exit indicator list (defaults to global INDICATORS) */
+  indicators?: Record<string, string>;
+  /** Override market trend / value indicator list (defaults to global MARKET_INDICATORS) */
+  marketIndicators?: Record<string, string>;
 };
 
-const RulesTreeEditor: React.FC<Props> = ({ label, tree, onChange, showPreview = true }) => {
+const RulesTreeEditor: React.FC<Props> = ({ label, tree, onChange, showPreview = true, indicators, marketIndicators }) => {
+
+  const _indicators = indicators ?? INDICATORS;
+  const _marketIndicators = marketIndicators ?? MARKET_INDICATORS;
   // bootstrap: if undefined, create a default root
 //   useEffect(() => {
 //     if (!tree) onChange(emptyRootTree());
@@ -203,6 +210,8 @@ const RulesTreeEditor: React.FC<Props> = ({ label, tree, onChange, showPreview =
                 depth={0}
                 onChangeNode={(id, updater) => onChange(updateNode(tree, id, updater) as RuleTree)}
                 onDeleteNode={(id) => onChange(deleteNode(tree, id) as RuleTree)}
+                _indicators={_indicators}
+                _marketIndicators={_marketIndicators}
             />
             ))}
         </div>
@@ -228,11 +237,15 @@ function NodeEditor({
   depth,
   onChangeNode,
   onDeleteNode,
+  _indicators,
+  _marketIndicators,
 }: {
   node: RuleNode;
   depth: number;
   onChangeNode: (id: string, updater: (n: RuleNode) => RuleNode) => void;
   onDeleteNode: (id: string) => void;
+  _indicators: Record<string, string>;
+  _marketIndicators: Record<string, string>;
 }) {
   if (node.type === "rule") {
     return (
@@ -240,6 +253,8 @@ function NodeEditor({
         rule={node.rule}
         onChange={(r) => onChangeNode(node.id, () => ({ type: "rule", id: node.id, rule: r }))}
         onRemove={() => onDeleteNode(node.id)}
+        _indicators={_indicators}
+        _marketIndicators={_marketIndicators}
       />
     );
   }
@@ -321,6 +336,8 @@ function NodeEditor({
         depth={depth + 1}
         onChangeNode={onChangeNode}
         onDeleteNode={onDeleteNode}
+        _indicators={_indicators}
+        _marketIndicators={_marketIndicators}
       />
     ))
   )}
@@ -334,10 +351,14 @@ function RuleRow({
   rule,
   onChange,
   onRemove,
+  _indicators,
+  _marketIndicators,
 }: {
   rule: Rule;
   onChange: (r: Rule) => void;
   onRemove: () => void;
+  _indicators: Record<string, string>;
+  _marketIndicators: Record<string, string>;
 }) {
   const valueType = rule.value_type || (rule.value > 0 ? "value" : "indicator_price");
 
@@ -388,7 +409,7 @@ function RuleRow({
           className="w-full border px-2 py-1 rounded focus:ring focus:ring-indigo-200"
         >
           <option value="">-- Select --</option>
-          {Object.entries(INDICATORS).map(([key, lbl]) => (
+          {Object.entries(_indicators).map(([key, lbl]) => (
             <option key={key} value={key}>
               {lbl}
             </option>
@@ -495,7 +516,7 @@ function RuleRow({
             className="w-full border px-2 py-1 rounded focus:ring focus:ring-indigo-200"
           >
             <option value="">-- Select --</option>
-            {Object.entries(MARKET_INDICATORS).map(([key, lbl]) => (
+            {Object.entries(_marketIndicators).map(([key, lbl]) => (
               <option key={key} value={key}>
                 {lbl}
               </option>
@@ -575,7 +596,7 @@ function RuleRow({
                 className="w-full border px-2 py-1 rounded focus:ring focus:ring-indigo-200"
                 >
                 <option value="">-- Select --</option>
-                {Object.entries(MARKET_INDICATORS).map(([key, lbl]) => (
+                {Object.entries(_marketIndicators).map(([key, lbl]) => (
                     <option key={key} value={key}>
                     {lbl}
                     </option>
