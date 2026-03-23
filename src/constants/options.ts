@@ -120,6 +120,8 @@ export const MARKET_REGIME_TYPE: Record<string, string> = {
 
 export const INDEX_TICKERS: Record<string, string> = {
   spy: "SPY",
+  vix: "VIX",
+  gld: "GLD",
 };
 
 export const COMPARISON_TYPES: Record<string, string> = {
@@ -156,4 +158,3 @@ export const INDICATOR_META: Record<string, any> = {
       ],
     },
   };
-

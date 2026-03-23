@@ -112,9 +112,11 @@ type Props = {
   indicators?: Record<string, string>;
   /** Override market trend / value indicator list (defaults to global MARKET_INDICATORS) */
   marketIndicators?: Record<string, string>;
+  /** When provided, shows a ticker dropdown per rule (for market trend rules) */
+  tickerOptions?: Record<string, string>;
 };
 
-const RulesTreeEditor: React.FC<Props> = ({ label, tree, onChange, showPreview = true, indicators, marketIndicators }) => {
+const RulesTreeEditor: React.FC<Props> = ({ label, tree, onChange, showPreview = true, indicators, marketIndicators, tickerOptions }) => {
 
   const _indicators = indicators ?? INDICATORS;
   const _marketIndicators = marketIndicators ?? MARKET_INDICATORS;
@@ -212,6 +214,7 @@ const RulesTreeEditor: React.FC<Props> = ({ label, tree, onChange, showPreview =
                 onDeleteNode={(id) => onChange(deleteNode(tree, id) as RuleTree)}
                 _indicators={_indicators}
                 _marketIndicators={_marketIndicators}
+                tickerOptions={tickerOptions}
             />
             ))}
         </div>
@@ -239,6 +242,7 @@ function NodeEditor({
   onDeleteNode,
   _indicators,
   _marketIndicators,
+  tickerOptions,
 }: {
   node: RuleNode;
   depth: number;
@@ -246,6 +250,7 @@ function NodeEditor({
   onDeleteNode: (id: string) => void;
   _indicators: Record<string, string>;
   _marketIndicators: Record<string, string>;
+  tickerOptions?: Record<string, string>;
 }) {
   if (node.type === "rule") {
     return (
@@ -255,7 +260,9 @@ function NodeEditor({
         onRemove={() => onDeleteNode(node.id)}
         _indicators={_indicators}
         _marketIndicators={_marketIndicators}
+        tickerOptions={tickerOptions}
       />
+      
     );
   }
 
@@ -338,6 +345,7 @@ function NodeEditor({
         onDeleteNode={onDeleteNode}
         _indicators={_indicators}
         _marketIndicators={_marketIndicators}
+        tickerOptions={tickerOptions}
       />
     ))
   )}
@@ -353,12 +361,14 @@ function RuleRow({
   onRemove,
   _indicators,
   _marketIndicators,
+  tickerOptions,
 }: {
   rule: Rule;
   onChange: (r: Rule) => void;
   onRemove: () => void;
   _indicators: Record<string, string>;
   _marketIndicators: Record<string, string>;
+  tickerOptions?: Record<string, string>;
 }) {
   const valueType = rule.value_type || (rule.value > 0 ? "value" : "indicator_price");
 
@@ -367,7 +377,23 @@ function RuleRow({
   const params = rule.params || {};
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-4 grid grid-cols-1 sm:grid-cols-6 gap-4 items-end">
+    <div className={`bg-white border border-gray-200 rounded-lg shadow-sm p-4 grid grid-cols-1 ${tickerOptions ? "sm:grid-cols-7" : "sm:grid-cols-6"} gap-4 items-end`}>
+      {/* Ticker — only for market trend rules */}
+      {tickerOptions && (
+      <div>
+        <label className="block text-xs font-semibold text-gray-600 mb-1">Ticker</label>
+        <select
+          value={rule.regime_ticker || ""}
+          onChange={(e) => onChange({ ...rule, regime_ticker: e.target.value })}
+          className="w-full border px-2 py-1 rounded focus:ring focus:ring-indigo-200"
+        >
+          <option value="">-- Ticker --</option>
+          {Object.entries(tickerOptions).map(([key, lbl]) => (
+            <option key={key} value={lbl}>{lbl}</option>
+          ))}
+        </select>
+      </div>
+      )}
       {/* Indicator */}
       <div>
         <label className="block text-xs font-semibold text-gray-600 mb-1">Indicator</label>

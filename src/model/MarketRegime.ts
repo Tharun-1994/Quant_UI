@@ -1,4 +1,3 @@
-
 // src/model/Strategy.ts
 export interface Rule {
   indicator: string;
@@ -12,6 +11,7 @@ export interface Rule {
   value_lookback: number;
   value_range_percent?: number;
   params?: Record<string, any>;
+  regime_ticker?: string;  // ticker context for market trend rules (e.g. "SPY", "VIX")
 }
 
 export type Logic = "AND" | "OR";

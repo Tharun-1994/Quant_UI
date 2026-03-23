@@ -128,10 +128,11 @@ const ETF_FREEZE_INDICATORS: Record<string, string> = {
 const EQUITY_FREEZE_INDICATORS: Record<string, string> = {
   atr: "Avg True Range",
   vix_close: "VIX Close Price",
+  hv: "Historical Volatility",
   adx: "ADX",
   close: "Close Price",
   sma: "SMA",
-
+  rsi: "RSI",
 };
 
 // ─── Regime type configs ────────────────────────────────────────

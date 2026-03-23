@@ -156,26 +156,7 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
           {regime.market_trend_type || regime.regime_type}
         </h3>
 
-        {/* {(regime.regime_type === "Simple" || regime.regime_type === "Complex" || regime.regime_type === "Individual ETFs - Simple") && (
-          <div className="flex flex-col">
-            <label className="block text-sm font-bold text-gray-700 mb-2">
-              Market Trend Ticker
-            </label>
-            <select
-              value={regime.regime_ticker}
-              onChange={(e) =>
-                onUpdate({ ...regime, regime_ticker: e.target.value })
-              }
-              className="px-4 py-2 border rounded-lg text-base font-medium bg-gray-50 focus:ring-2 focus:ring-indigo-300"
-            ><option value=""> Select Ticker</option>
-              {Object.entries(INDEX_TICKERS).map(([key, label]) => (
-                <option key={key} value={label}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-        )} */}
+        {/* regime_ticker moved to Market Trend Rules section */}
 
       </div>
 
@@ -304,6 +285,9 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
             <h4 className="text-lg font-bold text-indigo-800 mb-3">
               {regime.market_trend_type ? `(${regime.market_trend_type})` : ""}
             </h4>
+
+            {/* Ticker is now per-rule inside the Market Trend Rules editor */}
+
             <RulesTreeEditor
               key="market-rules-editor"
               label=" 📈 Market Trend Rules"
@@ -311,6 +295,7 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
               onChange={setMarketTrendRulesTree}
               indicators={config.indicators.marketTrend}
               marketIndicators={config.indicators.marketTrend}
+              tickerOptions={INDEX_TICKERS}
             />
           </div>
         )}

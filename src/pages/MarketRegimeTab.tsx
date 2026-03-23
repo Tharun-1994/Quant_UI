@@ -24,39 +24,28 @@ const MarketRegimeTab: React.FC<MarketRegimeTabProps> = ({
 
   const generateRegimes = (type: string) => {
     let base: MarketRegime[] = [];
+    const defaults = {
+      strategy_id: strategy.id,
+      regime_type: type,
+      regime_ticker: "",
+      entry_rules: [],
+      exit_rules: [],
+      universe: "",
+      capital: 0,
+      slots: 0,
+      entry_timing: "",
+      exit_timing: "",
+      order_type: "",
+    };
+
     if (type === "Normal") {
-      base = [
-        {
-          strategy_id: strategy.id,
-          regime_type: type,
-          regime_ticker: "",
-          entry_rules: [],
-          exit_rules: [],
-        },
-      ];
+      base = [{ ...defaults }];
     } else if (type === "Simple") {
-      base = [
-        {
-          strategy_id: strategy.id,
-          regime_type: type,
-          regime_ticker: "",
-          market_trend_type: "",
-          entry_rules: [],
-          exit_rules: [],
-        }
-      ];
+      base = [{ ...defaults, market_trend_type: "" }];
     } else if (type === "Complex") {
-      base = [
-        {
-          strategy_id: strategy.id,
-          regime_type: type,
-          regime_ticker: "",
-          market_trend_type: "",
-          entry_rules: [],
-          exit_rules: [],
-          volatility_rules: [],
-        },
-      ];
+      base = [{ ...defaults, market_trend_type: "", volatility_rules: [] }];
+    } else if (type === "Individual ETFs - Simple") {
+      base = [{ ...defaults, market_trend_type: "" }];
     }
     setRegimes(base);
     setRegimeType(type);
@@ -92,23 +81,35 @@ useEffect(() => {
         regime_ticker: "SPY",
         entry_rules: [],
         exit_rules: [],
+        universe: "",
+        capital: 0,
+        slots: 0,
+        entry_timing: "",
+        exit_timing: "",
+        order_type: "",
       },
     ]);
   };
   const validateRegime = (r: MarketRegime) => {
     const missing: string[] = [];
 
-    // if (!r.entry_rules?.length) missing.push("Entry rules");
-    // if (!r.exit_rules?.length) missing.push("Exit rules");
+    // Portfolio basics — required for all regime types
+    if (!r.universe) missing.push("Universe");
+    if (!r.capital || r.capital <= 0) missing.push("Capital");
+    if (!r.slots || r.slots <= 0) missing.push("Slots");
 
+    // Timing — required for all
     if (!r.entry_timing) missing.push("Entry timing");
     if (!r.exit_timing) missing.push("Exit timing");
 
     if (!r.order_type) missing.push("Order type");
 
-    if (!r.ranking && r.regime_type != 'Individual ETFs - Simple') missing.push("Ranking indicator");
-    if (!r.ranking_lookback && r.regime_type != 'Individual ETFs - Simple') missing.push("Ranking lookback");
-    if (!r.ranking_order && r.regime_type != 'Individual ETFs - Simple') missing.push("Ranking order");
+    // Ranking — required for equity (not ETF)
+    if (r.regime_type !== 'Individual ETFs - Simple') {
+      if (!r.ranking) missing.push("Ranking indicator");
+      if (!r.ranking_lookback) missing.push("Ranking lookback");
+      if (!r.ranking_order) missing.push("Ranking order");
+    }
 
     return missing;
   };
@@ -161,15 +162,31 @@ const handleSave = async () => {
     }
 
     const updatedRegimes: MarketRegime[] = [];
+    const warnings: string[] = [];
 
     for (const regime of regimes) {
       console.log(regime)
       const payload: MarketRegime = {
         ...regime,
-        strategy_id: strategy.id, // safe
+        strategy_id: strategy.id,
+        // Null-safe defaults — Java int fields can't handle null
+        banned_months: regime.banned_months || [],
+        atr_lookback_stp: regime.atr_lookback_stp ?? 0,
+        atr_lookback_tp: regime.atr_lookback_tp ?? 0,
+        atr_limit_lookback: regime.atr_limit_lookback ?? 0,
+        stoploss_pct: regime.stoploss_pct ?? 0,
+        takeprofit_pct: regime.takeprofit_pct ?? 0,
+        stoploss_dollar: regime.stoploss_dollar ?? 0,
+        takeprofit_dollar: regime.takeprofit_dollar ?? 0,
+        limit_pct: regime.limit_pct ?? 0,
+        max_time: regime.max_time ?? 0,
+        stoploss_type: regime.stoploss_type || "",
+        takeprofit_type: regime.takeprofit_type || "",
+        stoploss_timing: regime.stoploss_timing || "",
+        takeprofit_timing: regime.takeprofit_timing || "",
         market_trend_rules: (regime.market_trend_rules || []).map((rule) => ({
           ...rule,
-          value: rule.value_type !== "value" ? 0 : rule.value, // normalize without mutating
+          value: rule.value_type !== "value" ? 0 : rule.value,
         })),
       };
 
@@ -182,10 +199,19 @@ const handleSave = async () => {
         ...regime,
         id: regime.id ?? res.id,
       });
+
+      // Check for generate warning
+      if (res.warning) {
+        warnings.push(`Regime ${updatedRegimes.length}: ${res.warning}`);
+      }
     }
 
     setRegimes(updatedRegimes);
-    setMessage("✅ Strategy & Regimes saved successfully");
+    if (warnings.length > 0) {
+      setMessage(`⚠️ Saved but with warnings:\n${warnings.join("\n")}`);
+    } else {
+      setMessage("✅ Strategy & Regimes saved successfully");
+    }
   } catch (err) {
     console.error(err);
     setMessage("❌ Failed to save strategy");
@@ -318,5 +344,3 @@ const handleRunBacktest = async () => {
 };
 
 export default MarketRegimeTab;
-
-
