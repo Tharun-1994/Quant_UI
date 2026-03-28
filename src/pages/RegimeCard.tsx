@@ -881,6 +881,46 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
                   ))}
                 </select>
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Sector Level
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={5}
+                    value={regime.sector_level || ""}
+                    placeholder="0 = disabled"
+                    onChange={(e) =>
+                      onUpdate({
+                        ...regime,
+                        sector_level: +e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-indigo-200"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Max Per Sector
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={regime.sector_limit || ""}
+                    placeholder="0 = disabled"
+                    onChange={(e) =>
+                      onUpdate({
+                        ...regime,
+                        sector_limit: +e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-indigo-200"
+                  />
+                </div>
+              </div>
             </div>
           </div>
             )}

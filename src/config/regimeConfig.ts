@@ -79,6 +79,7 @@ const EQUITY_ENTRY_INDICATORS: Record<string, string> = {
   unadjusted_close: "Unadjusted Close Price",
   relative_momentum: "Relative Momentum",
   average_volume: "Average Volume",
+  sharpe: "Sharpe Ratio",
   close: "Close Price",
   n_week_high_recent: "N-Week High occurred within last X days",
   vix_close: "VIX Close Price",

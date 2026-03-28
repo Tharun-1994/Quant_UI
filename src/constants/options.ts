@@ -28,8 +28,10 @@ export const INDICATORS: Record<string, string> = {
   relative_momentum: "Relative Momentum",
   average_volume: "Average Volume",
   close: "Close Price",
+  sharpe: "Sharpe Ratio",
   n_week_high_recent: "N-Week High occurred within last X days",
-  'vix_close': "VIX Close Price",
+  vix_close: "VIX Close Price",
+  rolling_vol: "Rolling Volatility",
 };
 
 export const MARKET_INDICATORS: Record<string, string> = {
@@ -85,7 +87,7 @@ export const RANKING_ORDERS: Record<string, string> = {
 // System Types
 export const SYSTEM_TYPE: Record<string, string> = {
   long: "LONG",
-  // short: "SHORT"
+  short: "SHORT"
 };
 
 // Order Types
@@ -127,7 +129,7 @@ export const INDEX_TICKERS: Record<string, string> = {
 export const COMPARISON_TYPES: Record<string, string> = {
   value: "Value",
   indicator_price: "Indicator/ Price",
-
+  top_n: "Top N",
 };
 
 // constants/indicatorDefaults.ts
@@ -145,6 +147,14 @@ export const INDICATOR_META: Record<string, any> = {
   unadjusted_close: { hasLookback: false },
   close: { hasLookback: false },
   sma: { hasLookback: true },
+  sharpe: {
+  hasLookback: false,
+  params: [
+      { key: "momentum_lookback", label: "Momentum Lookback", type: "number", default: 252, min: 1 },
+      { key: "vol_lookback", label: "Vol Lookback", type: "number", default: 252, min: 1 },
+      { key: "skip_days", label: "Skip Days", type: "number", default: 0, min: 0 },
+    ]
+  },
   vix_close: { hasLookback: false },
   range_close: { hasLookback: false, hasRange: true },
 

@@ -76,11 +76,12 @@ function ruleToExpr(r: Rule): string {
   }
 
   // existing logic for normal indicators
-  if (!r.operator) return "";
+  if (!r.operator && r.value_type !== "top_n") return "";
   const left = `${r.indicator}_${r.lookback ?? 0}`;
 
   const vt = r.value_type || (r.value > 0 ? "value" : "indicator_price");
 
+  if (vt === "top_n") return `${left} TOP ${Number(r.value)} (${r.ranking_order === "Ascending" ? "lowest" : "highest"})`;
   if (vt === "value") return `${left} ${r.operator} ${Number(r.value)}`;
 
   const right = r.value_indicator ? `${r.value_indicator}_${r.value_lookback ?? 0}` : "???";
@@ -414,7 +415,7 @@ function RuleRow({
               ...rule,
               indicator: selected,
 
-              lookback: selected === "crsi" ? 2 : 0,
+              lookback: selected === "crsi" ? 2 : (nextMeta?.defaultLookback ?? 0),
 
               operator: nextIsBoolean ? "IS_TRUE" : rule.operator,
               value_type: nextIsBoolean ? "value" : rule.value_type,
@@ -565,7 +566,8 @@ function RuleRow({
       )} */}
         {!isBoolean ? (
         <>
-            {/* Operator */}
+            {/* Operator — hidden for top_n */}
+            {valueType !== "top_n" && (
             <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Operator</label>
             <select
@@ -581,13 +583,31 @@ function RuleRow({
                 ))}
             </select>
             </div>
+            )}
 
             {/* Value Type */}
             <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Value Type</label>
             <select
                 value={valueType}
-                onChange={(e) => onChange({ ...rule, value_type: e.target.value })}
+                onChange={(e) => {
+                  const newType = e.target.value;
+                  const updates: Partial<Rule> = { value_type: newType };
+                  if (newType === "top_n") {
+                    updates.operator = "top";
+                    updates.ranking_order = "Descending";
+                    updates.value = rule.value || 100;
+                    updates.value_indicator = "";
+                    updates.value_lookback = 0;
+                  } else if (newType === "value") {
+                    updates.operator = rule.operator === "top" ? ">=" : rule.operator;
+                    updates.ranking_order = undefined;
+                  } else {
+                    updates.operator = rule.operator === "top" ? ">=" : rule.operator;
+                    updates.ranking_order = undefined;
+                  }
+                  onChange({ ...rule, ...updates } as Rule);
+                }}
                 className="w-full border px-2 py-1 rounded focus:ring focus:ring-indigo-200"
             >
                 <option value="">-- Select --</option>
@@ -599,7 +619,34 @@ function RuleRow({
             </select>
             </div>
 
-            {/* Value */}
+            {/* ── Top N fields ── */}
+            {valueType === "top_n" && (
+            <>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Top N</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={rule.value || 100}
+                  onChange={(e) => onChange({ ...rule, value: +e.target.value })}
+                  className="w-full border px-2 py-1 rounded focus:ring focus:ring-indigo-200"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Order</label>
+                <select
+                  value={rule.ranking_order || "Descending"}
+                  onChange={(e) => onChange({ ...rule, ranking_order: e.target.value })}
+                  className="w-full border px-2 py-1 rounded focus:ring focus:ring-indigo-200"
+                >
+                  <option value="Descending">Highest</option>
+                  <option value="Ascending">Lowest</option>
+                </select>
+              </div>
+            </>
+            )}
+
+            {/* ── Value (numeric threshold) ── */}
             {valueType === "value" && (
             <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Value</label>
@@ -612,7 +659,7 @@ function RuleRow({
             </div>
             )}
 
-            {/* Compare To */}
+            {/* ── Indicator price fields ── */}
             {valueType === "indicator_price" && (
             <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Compare To</label>
@@ -631,7 +678,6 @@ function RuleRow({
             </div>
             )}
 
-            {/* Compare To Lookback */}
             {valueType === "indicator_price" && (INDICATOR_META[rule.value_indicator]?.hasLookback ?? true) && (
             <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Lookback</label>

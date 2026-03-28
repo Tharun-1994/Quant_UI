@@ -12,6 +12,7 @@ export interface Rule {
   value_range_percent?: number;
   params?: Record<string, any>;
   regime_ticker?: string;  // ticker context for market trend rules (e.g. "SPY", "VIX")
+  ranking_order?: string;  // for top_n: "Ascending" or "Descending"
 }
 
 export type Logic = "AND" | "OR";
@@ -84,4 +85,7 @@ export interface MarketRegime {
   market_trend_rules_tree ?: RuleTree;
 
   is_look_inside_bar?: boolean;
+
+   sector_level?: number;
+  sector_limit?: number;
 }
