@@ -83,6 +83,8 @@ const EQUITY_ENTRY_INDICATORS: Record<string, string> = {
   close: "Close Price",
   n_week_high_recent: "N-Week High occurred within last X days",
   vix_close: "VIX Close Price",
+  roc: "Rate of Change",
+  close_minus_open: "Close Minus Open",
 };
 
 /** Indicators applicable to individual ETF strategies (SPY, GLD, etc.) */
@@ -165,7 +167,7 @@ const REGIME_CONFIGS: Record<string, RegimeTypeConfig> = {
     label: "Normal",
     features: {
       lookInsideBar: false,
-      intradayTiming: false,
+      intradayTiming: true,
       ranking: true,
       volatilityRules: false,
       marketTrendRules: false,
@@ -186,7 +188,7 @@ const REGIME_CONFIGS: Record<string, RegimeTypeConfig> = {
     label: "Simple",
     features: {
       lookInsideBar: false,
-      intradayTiming: false,
+      intradayTiming: true,
       ranking: true,
       volatilityRules: false,
       marketTrendRules: true,

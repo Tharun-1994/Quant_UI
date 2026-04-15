@@ -1,5 +1,5 @@
 import React, { use, useEffect, useMemo, useRef, useState } from "react";
-import { MarketRegime, RuleTree } from "../model/MarketRegime";
+import { MarketRegime, RuleTree, TdomFilter, VolFilter } from "../model/MarketRegime";
 import {
   INDEX_TICKERS,
   ORDER_TYPE,
@@ -924,6 +924,71 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
             </div>
           </div>
             )}
+          {/* Gap Filter Section */}
+          <div className="bg-gray-50 p-4 rounded-lg border">
+            <h5 className="font-bold text-gray-900 mb-3">Gap Filter</h5>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Max Gap % (skip entries gapping beyond this %)
+              </label>
+              <input
+                type="number"
+                min={0}
+                step={0.1}
+                value={regime.gap_filter_pct || ""}
+                placeholder="0 = disabled"
+                onChange={(e) =>
+                  onUpdate({
+                    ...regime,
+                    gap_filter_pct: +e.target.value,
+                  })
+                }
+                className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-indigo-200"
+              />
+            </div>
+          </div>
+          {/* Max Duplicates Section */}
+          <div className="bg-gray-50 p-4 rounded-lg border">
+            <h5 className="font-bold text-gray-900 mb-3">Duplicate Positions</h5>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Max Per Ticker
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={regime.max_duplicates || ""}
+                  placeholder="1 = no duplicates"
+                  onChange={(e) =>
+                    onUpdate({
+                      ...regime,
+                      max_duplicates: +e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-indigo-200"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Max Duplicate Pairs
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={regime.max_duplicate_sets || ""}
+                  placeholder="0 = no limit"
+                  onChange={(e) =>
+                    onUpdate({
+                      ...regime,
+                      max_duplicate_sets: +e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-indigo-200"
+                />
+              </div>
+            </div>
+          </div>
           {/* Banned Months Section */}
           <div className="bg-gray-50 p-4 rounded-lg border">
             <h5 className="font-bold text-gray-900 mb-3">Banned Months</h5>
@@ -960,6 +1025,332 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
             <p className="text-xs text-gray-500 mt-3 text-center">
               Click months to <span className="font-semibold text-red-600">exclude</span> from trading.
             </p>
+          </div>
+
+          {/* TDOM Filters Section */}
+          <div className="bg-gray-50 p-4 rounded-lg border">
+            <div className="flex justify-between items-center mb-3">
+              <div>
+                <h5 className="font-bold text-gray-900">TDOM Filters</h5>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Block entries on a specific trading-day-of-month position or weekday, for selected months only.
+                </p>
+              </div>
+              <button
+                onClick={() =>
+                  onUpdate({
+                    ...regime,
+                    tdom_filters: [
+                      ...(regime.tdom_filters || []),
+                      { banned_months: [] },
+                    ],
+                  })
+                }
+                className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition whitespace-nowrap"
+              >
+                + Add Rule
+              </button>
+            </div>
+
+            {(!regime.tdom_filters || regime.tdom_filters.length === 0) && (
+              <p className="text-xs text-gray-400 italic text-center py-2">
+                No TDOM filter rules. Click "+ Add Rule" to create one.
+              </p>
+            )}
+
+            {(regime.tdom_filters || []).map((filter: TdomFilter, fi: number) => {
+              const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+              const TDOM_LABELS  = ["1st","2nd","3rd","4th","5th","6th","7th","8th","9th","10th"];
+              const WD_LABELS    = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+
+              // Encode current selection as a single string for the <select>
+              // Use != null (not !== undefined) so that JSON null values are handled correctly
+              const selectValue =
+                filter.tdom != null
+                  ? `tdom_${filter.tdom}`
+                  : filter.weekday != null
+                  ? `wd_${filter.weekday}`
+                  : "";
+
+              const handleTypeChange = (val: string) => {
+                const updated = [...(regime.tdom_filters || [])];
+                if (val.startsWith("tdom_")) {
+                  const n = parseInt(val.split("_")[1], 10);
+                  updated[fi] = { banned_months: filter.banned_months, tdom: n };
+                } else if (val.startsWith("wd_")) {
+                  const n = parseInt(val.split("_")[1], 10);
+                  updated[fi] = { banned_months: filter.banned_months, weekday: n };
+                } else {
+                  updated[fi] = { banned_months: filter.banned_months };
+                }
+                onUpdate({ ...regime, tdom_filters: updated });
+              };
+
+              const handleMonthToggle = (monthNum: number) => {
+                const updated = [...(regime.tdom_filters || [])];
+                const already = filter.banned_months.includes(monthNum);
+                updated[fi] = {
+                  ...filter,
+                  banned_months: already
+                    ? filter.banned_months.filter((m) => m !== monthNum)
+                    : [...filter.banned_months, monthNum],
+                };
+                onUpdate({ ...regime, tdom_filters: updated });
+              };
+
+              const handleRemove = () => {
+                const updated = (regime.tdom_filters || []).filter((_, i) => i !== fi);
+                onUpdate({ ...regime, tdom_filters: updated });
+              };
+
+              return (
+                <div
+                  key={fi}
+                  className="mb-3 p-3 bg-white border rounded-lg"
+                >
+                  {/* Rule header row */}
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="text-xs font-semibold text-gray-500 w-16 shrink-0">
+                      Rule {fi + 1}
+                    </span>
+
+                    {/* Type selector */}
+                    <select
+                      value={selectValue}
+                      onChange={(e) => handleTypeChange(e.target.value)}
+                      className="text-sm border rounded-lg px-2 py-1.5 bg-white focus:ring focus:ring-indigo-200 flex-1 min-w-0"
+                    >
+                      <option value="">-- Select day type --</option>
+                      <optgroup label="Trading Day of Month (0-based)">
+                        {TDOM_LABELS.map((label, n) => (
+                          <option key={`tdom_${n}`} value={`tdom_${n}`}>
+                            {label} trading day of month (TDOM {n})
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Day of Week">
+                        {WD_LABELS.map((label, n) => (
+                          <option key={`wd_${n}`} value={`wd_${n}`}>
+                            Every {label} (weekday {n})
+                          </option>
+                        ))}
+                      </optgroup>
+                    </select>
+
+                    {/* Remove button */}
+                    <button
+                      onClick={handleRemove}
+                      className="text-red-400 hover:text-red-600 text-xl font-bold leading-none shrink-0"
+                      title="Remove rule"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* Month toggles */}
+                  <div className="flex flex-wrap gap-1.5 mt-1 pl-16">
+                    {MONTH_LABELS.map((label, idx) => {
+                      const monthNum = idx + 1;
+                      const active = filter.banned_months.includes(monthNum);
+                      return (
+                        <button
+                          key={label}
+                          onClick={() => handleMonthToggle(monthNum)}
+                          className={`text-xs font-medium px-2 py-1 rounded-full border transition
+                            ${active
+                              ? "bg-red-100 border-red-400 text-red-700 hover:bg-red-200"
+                              : "bg-white border-gray-300 text-gray-600 hover:bg-gray-100"
+                            }`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Summary line */}
+                  {selectValue && filter.banned_months.length > 0 && (
+                    <p className="text-xs text-gray-500 mt-2 pl-16">
+                      Block entries on{" "}
+                      <span className="font-semibold text-gray-700">
+                        {selectValue.startsWith("tdom_")
+                          ? `${TDOM_LABELS[parseInt(selectValue.split("_")[1], 10)]} trading day`
+                          : `every ${WD_LABELS[parseInt(selectValue.split("_")[1], 10)]}`}
+                      </span>{" "}
+                      when month is in:{" "}
+                      <span className="font-semibold text-red-600">
+                        {filter.banned_months
+                          .sort((a, b) => a - b)
+                          .map((m) => MONTH_LABELS[m - 1])
+                          .join(", ")}
+                      </span>
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Vol / Turnover Filter Section */}
+          <div className="bg-gray-50 p-4 rounded-lg border">
+            <div className="flex justify-between items-center mb-2">
+              <div>
+                <h5 className="font-bold text-gray-900">Vol / Turnover Filter</h5>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Yearly-recalculated universe-wide percentile thresholds. Entries below the
+                  threshold are excluded. Triggered on the 1st January trading day each year.
+                </p>
+              </div>
+              {/* Enable toggle */}
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <span className="text-sm text-gray-600">
+                  {regime.vol_filter?.enabled ? "Enabled" : "Disabled"}
+                </span>
+                <div
+                  onClick={() => {
+                    const current = regime.vol_filter;
+                    const next: VolFilter = current?.enabled
+                      ? { ...current, enabled: false }
+                      : {
+                          enabled: true,
+                          spy_ticker: current?.spy_ticker ?? "spy",
+                          vol_pct_bull: current?.vol_pct_bull ?? 0.20,
+                          vol_pct_bear: current?.vol_pct_bear ?? 0.45,
+                          turnover_pct_bull: current?.turnover_pct_bull ?? 0.35,
+                          turnover_pct_bear: current?.turnover_pct_bear ?? 0.05,
+                        };
+                    onUpdate({ ...regime, vol_filter: next });
+                  }}
+                  className={`w-11 h-6 rounded-full transition-colors cursor-pointer flex items-center px-1
+                    ${regime.vol_filter?.enabled ? "bg-indigo-600" : "bg-gray-300"}`}
+                >
+                  <div
+                    className={`w-4 h-4 bg-white rounded-full shadow transition-transform
+                      ${regime.vol_filter?.enabled ? "translate-x-5" : "translate-x-0"}`}
+                  />
+                </div>
+              </label>
+            </div>
+
+            {regime.vol_filter?.enabled && (
+              <div className="mt-3 space-y-3">
+                {/* SPY ticker */}
+                <div className="flex items-center gap-3">
+                  <label className="text-sm text-gray-600 w-32 shrink-0">SPY Ticker</label>
+                  <input
+                    type="text"
+                    value={regime.vol_filter?.spy_ticker ?? "spy"}
+                    onChange={(e) =>
+                      onUpdate({
+                        ...regime,
+                        vol_filter: { ...(regime.vol_filter as VolFilter), spy_ticker: e.target.value },
+                      })
+                    }
+                    className="text-sm border rounded-lg px-2 py-1.5 w-28 focus:ring focus:ring-indigo-200"
+                    placeholder="spy"
+                  />
+                  <span className="text-xs text-gray-400">
+                    Used to compute SMA(200) for bull/bear regime detection
+                  </span>
+                </div>
+
+                {/* Percentile grid */}
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Vol Bull */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Volume — Bull (SPY &gt; SMA200)
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={0} max={1} step={0.01}
+                        value={regime.vol_filter?.vol_pct_bull ?? 0.20}
+                        onChange={(e) =>
+                          onUpdate({
+                            ...regime,
+                            vol_filter: { ...(regime.vol_filter as VolFilter), vol_pct_bull: +e.target.value },
+                          })
+                        }
+                        className="text-sm border rounded-lg px-2 py-1.5 w-24 focus:ring focus:ring-indigo-200"
+                      />
+                      <span className="text-xs text-gray-400">bottom fraction excluded</span>
+                    </div>
+                  </div>
+
+                  {/* Vol Bear */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Volume — Bear (SPY ≤ SMA200)
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={0} max={1} step={0.01}
+                        value={regime.vol_filter?.vol_pct_bear ?? 0.45}
+                        onChange={(e) =>
+                          onUpdate({
+                            ...regime,
+                            vol_filter: { ...(regime.vol_filter as VolFilter), vol_pct_bear: +e.target.value },
+                          })
+                        }
+                        className="text-sm border rounded-lg px-2 py-1.5 w-24 focus:ring focus:ring-indigo-200"
+                      />
+                      <span className="text-xs text-gray-400">bottom fraction excluded</span>
+                    </div>
+                  </div>
+
+                  {/* Turnover Bull */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Turnover — Bull (SPY &gt; SMA200)
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={0} max={1} step={0.01}
+                        value={regime.vol_filter?.turnover_pct_bull ?? 0.35}
+                        onChange={(e) =>
+                          onUpdate({
+                            ...regime,
+                            vol_filter: { ...(regime.vol_filter as VolFilter), turnover_pct_bull: +e.target.value },
+                          })
+                        }
+                        className="text-sm border rounded-lg px-2 py-1.5 w-24 focus:ring focus:ring-indigo-200"
+                      />
+                      <span className="text-xs text-gray-400">bottom fraction excluded</span>
+                    </div>
+                  </div>
+
+                  {/* Turnover Bear */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Turnover — Bear (SPY ≤ SMA200)
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={0} max={1} step={0.01}
+                        value={regime.vol_filter?.turnover_pct_bear ?? 0.05}
+                        onChange={(e) =>
+                          onUpdate({
+                            ...regime,
+                            vol_filter: { ...(regime.vol_filter as VolFilter), turnover_pct_bear: +e.target.value },
+                          })
+                        }
+                        className="text-sm border rounded-lg px-2 py-1.5 w-24 focus:ring focus:ring-indigo-200"
+                      />
+                      <span className="text-xs text-gray-400">bottom fraction excluded</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Summary */}
+                <p className="text-xs text-gray-500 pt-1 border-t mt-2">
+                  CRDT_1 defaults: Vol bull=0.20, bear=0.45 · Turnover bull=0.35, bear=0.05
+                </p>
+              </div>
+            )}
           </div>
 
         </div>

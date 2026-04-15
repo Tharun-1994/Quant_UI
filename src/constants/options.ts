@@ -1,12 +1,12 @@
 // Universes
 export const UNIVERSES: Record<string, string> = {
   sp500: "S&P 500",
-  r3000: "Russell 3000",
+  russell3000: "Russell 3000",
   liquid500: "Liquid 500",
 };
 export const UNIVERSES_CODES: Record<string, string> = {
   "S&P 500": "sp500",
-  "Russell 3000": "r3000",
+  "Russell 3000": "russell3000",
   "Liquid 500": "liquid500",
 };
 
@@ -68,6 +68,7 @@ export const REBALANCE: Record<string, string> = {
 export const SIGNAL_TIMING: Record<string, string> = {
   open: "Next bar Open",
   close: "This Bar Close",
+  eod_close: "EOD Close",   // ← add this
 };
 
 
@@ -138,15 +139,18 @@ export const INDICATOR_CONFIG: Record<
   string,
   { lookback?: number; disableLookback?: boolean }
 > = {
-  crsi: { lookback: 2 },             // auto-sets to 2            // example default
-  unadjusted_close: { disableLookback: true }, // disables lookback
+  crsi: { lookback: 2 },
+  unadjusted_close: { disableLookback: true },
   daily_close: { disableLookback: true },
+  close_minus_open: { disableLookback: true },
 };
 
 export const INDICATOR_META: Record<string, any> = {
   unadjusted_close: { hasLookback: false },
   close: { hasLookback: false },
   sma: { hasLookback: true },
+  roc: { hasLookback: true },
+  close_minus_open: { hasLookback: false },
   sharpe: {
   hasLookback: false,
   params: [

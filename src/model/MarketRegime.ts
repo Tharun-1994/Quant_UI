@@ -87,5 +87,27 @@ export interface MarketRegime {
   is_look_inside_bar?: boolean;
 
    sector_level?: number;
-  sector_limit?: number;
+   sector_limit?: number;
+
+    gap_filter_pct?: number;
+
+    max_duplicates?: number;
+    max_duplicate_sets?: number;
+    tdom_filters?: TdomFilter[];
+    vol_filter?: VolFilter | null;
+}
+
+export interface TdomFilter {
+  tdom?: number;           // 0 = 1st trading day of month, 1 = 2nd, etc.
+  weekday?: number;        // 0 = Monday … 4 = Friday
+  banned_months: number[]; // 1=Jan … 12=Dec
+}
+
+export interface VolFilter {
+  enabled: boolean
+  spy_ticker: string         // default "spy"
+  vol_pct_bull: number       // 0.20 — bottom 20% excluded when SPY > SMA200
+  vol_pct_bear: number       // 0.45 — bottom 45% excluded when SPY <= SMA200
+  turnover_pct_bull: number  // 0.35
+  turnover_pct_bear: number  // 0.05
 }
