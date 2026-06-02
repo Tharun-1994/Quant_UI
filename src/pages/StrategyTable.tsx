@@ -2,12 +2,14 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Strategy } from "../model/Strategy.ts";
-import { fetchStrategies } from "../services/strategyService.ts";
+import { fetchStrategies, deleteStrategy } from "../services/strategyService.ts";
 
 const StrategyTable: React.FC = () => {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -17,13 +19,33 @@ const StrategyTable: React.FC = () => {
       .finally(() => setLoading(false));
   }, []);
 
+  const handleDelete = async (strat: Strategy) => {
+    const confirmed = window.confirm(
+      `Delete strategy "${strat.name}"?\n\nThis will also remove all related market regimes. This action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingId(strat.id);
+      setError(null);
+      await deleteStrategy(strat.id);
+      setStrategies((prev) => prev.filter((s) => s.id !== strat.id));
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.detail ||
+        err?.message ||
+        "Failed to delete strategy"
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   if (loading) {
     return <p className="p-6">Loading strategies...</p>;
   }
 
-  if (error) {
-    return <p className="p-6 text-red-500">Error: {error}</p>;
-  }
+
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -37,12 +59,32 @@ const StrategyTable: React.FC = () => {
             View and manage your saved strategies.
           </p>
         </div>
-        <button
-          onClick={() => navigate("/strategies/new")}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition"
-        >
-          + New Strategy
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate("/indicators")}
+            className="px-4 py-2 text-sm border border-indigo-300 text-indigo-600 rounded-lg hover:bg-indigo-50 transition"
+          >
+            Rule info
+          </button>
+          <button
+            onClick={() => navigate("/strategies/new")}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition"
+          >
+            + New Strategy
+          </button>
+        </div>
+        {error && (
+        <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700 flex items-center justify-between">
+          <span>Error: {error}</span>
+          <button
+            onClick={() => setError(null)}
+            className="text-red-700 hover:text-red-900 font-medium"
+            aria-label="Dismiss error"
+          >
+            ×
+          </button>
+        </div>
+      )}
       </header>
 
       {/* Table */}
@@ -72,12 +114,22 @@ const StrategyTable: React.FC = () => {
                   {new Date(strat.created_at).toISOString().split("T")[0]}
                 </td>
                 <td className="px-4 py-2 text-right">
-                  <button
-                    onClick={() => navigate(`/strategies/${strat.id}/edit`)}
-                    className="px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                  >
-                    Edit
-                  </button>
+                  <div className="inline-flex items-center gap-2">
+                    <button
+                      onClick={() => navigate(`/strategies/${strat.id}/edit`)}
+                      disabled={deletingId === strat.id}
+                      className="px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(strat)}
+                      disabled={deletingId === strat.id}
+                      className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {deletingId === strat.id ? "Deleting..." : "Delete"}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

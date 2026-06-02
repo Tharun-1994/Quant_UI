@@ -259,7 +259,7 @@ const handleRunBacktest = async () => {
 
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6  w-max max-w-7xl ">
 
 
       <div>

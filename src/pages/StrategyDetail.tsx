@@ -9,6 +9,7 @@ import { Strategy } from "../model/Strategy.ts";
 import { fetchStrategyById } from "../services/strategyService.ts";
 import MarketRegimeTab from "./MarketRegimeTab.tsx";
 import DownloadTab from "./DownloadTab.tsx";
+import { STRATEGY_TABS } from "../constants/uiConstants.ts";
 
 
 interface StrategyDetailProps {
@@ -55,7 +56,7 @@ const StrategyDetail: React.FC<StrategyDetailProps> = ({ mode }) => {
 
       {/* Tabs */}
       <nav className="flex space-x-4 border-b pb-2 mb-4">
-        {["overview","marketRegime", "equity", "performance", "download"].map((key) => (
+        {STRATEGY_TABS.map(({ key, label }) => (
           <button
             key={key}
             onClick={() => setTab(key as any)}
@@ -63,7 +64,7 @@ const StrategyDetail: React.FC<StrategyDetailProps> = ({ mode }) => {
               tab === key ? "border-b-2 border-indigo-600 text-indigo-700" : "text-gray-500"
             }`}
           >
-            {key[0].toUpperCase() + key.slice(1)}
+            {label}
           </button>
         ))}
       </nav>

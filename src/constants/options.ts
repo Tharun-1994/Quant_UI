@@ -10,36 +10,10 @@ export const UNIVERSES_CODES: Record<string, string> = {
   "Liquid 500": "liquid500",
 };
 
-
 export const INDIVIDUAL_ETFS = [
   { key: "SPY", label: "SPY" },
-  { key: "GLD", label: "Gold (GLD)" }, // “Gold” as ETF
+  { key: "GLD", label: "Gold (GLD)" },
 ];
-
-// Indicators
-export const INDICATORS: Record<string, string> = {
-  rsi: "RSI",
-  adx: "ADX",
-  sma: "SMA",
-  hv: "Historical Volatility",
-  atr: "Avg True Range",
-  crsi: "CRSI",
-  unadjusted_close: "Unadjusted Close Price",
-  relative_momentum: "Relative Momentum",
-  average_volume: "Average Volume",
-  close: "Close Price",
-  sharpe: "Sharpe Ratio",
-  n_week_high_recent: "N-Week High occurred within last X days",
-  vix_close: "VIX Close Price",
-  rolling_vol: "Rolling Volatility",
-};
-
-export const MARKET_INDICATORS: Record<string, string> = {
-  close: "Close Price",
-  sma: "SMA",
-  atr: "Avg True Range",
-  range_close: "Range Close",
-};
 
 // Operators
 export const OPERATORS: Record<string, string> = {
@@ -49,6 +23,7 @@ export const OPERATORS: Record<string, string> = {
   ">=": ">=",
   "==": "==",
   IS_TRUE: "is true",
+  month_in: "month in (e.g. 5,6)",
 };
 
 // Connectors
@@ -68,10 +43,8 @@ export const REBALANCE: Record<string, string> = {
 export const SIGNAL_TIMING: Record<string, string> = {
   open: "Next bar Open",
   close: "This Bar Close",
-  eod_close: "EOD Close",   // ← add this
+  eod_close: "EOD Close",
 };
-
-
 
 // Risk Timing
 export const RISK_TIMING: Record<string, string> = {
@@ -88,7 +61,7 @@ export const RANKING_ORDERS: Record<string, string> = {
 // System Types
 export const SYSTEM_TYPE: Record<string, string> = {
   long: "LONG",
-  short: "SHORT"
+  short: "SHORT",
 };
 
 // Order Types
@@ -112,8 +85,7 @@ export const TAKEPROFIT_TYPE: Record<string, string> = {
   dollar_based: "DOLLAR_BASED",
 };
 
-
-// market regime Type
+// Market regime Type
 export const MARKET_REGIME_TYPE: Record<string, string> = {
   individual_etfs_simple: "Individual ETFs - Simple",
   normal: "Normal",
@@ -130,11 +102,10 @@ export const INDEX_TICKERS: Record<string, string> = {
 export const COMPARISON_TYPES: Record<string, string> = {
   value: "Value",
   indicator_price: "Indicator/ Price",
-  top_n: "Top N",
+  top_n: "Top N (raw)",
+  top_n_universe: "Top N (within active universe)",
 };
 
-// constants/indicatorDefaults.ts
-// constants/indicatorDefaults.ts
 export const INDICATOR_CONFIG: Record<
   string,
   { lookback?: number; disableLookback?: boolean }
@@ -145,30 +116,8 @@ export const INDICATOR_CONFIG: Record<
   close_minus_open: { disableLookback: true },
 };
 
-export const INDICATOR_META: Record<string, any> = {
-  unadjusted_close: { hasLookback: false },
-  close: { hasLookback: false },
-  sma: { hasLookback: true },
-  roc: { hasLookback: true },
-  close_minus_open: { hasLookback: false },
-  sharpe: {
-  hasLookback: false,
-  params: [
-      { key: "momentum_lookback", label: "Momentum Lookback", type: "number", default: 252, min: 1 },
-      { key: "vol_lookback", label: "Vol Lookback", type: "number", default: 252, min: 1 },
-      { key: "skip_days", label: "Skip Days", type: "number", default: 0, min: 0 },
-    ]
-  },
-  vix_close: { hasLookback: false },
-  range_close: { hasLookback: false, hasRange: true },
-
-  n_week_high_recent: {
-      label: 'N-Week High occurred within last X days',
-      hasLookback: false,
-      kind: 'boolean',
-      params: [
-        { key: 'n_week_days', label: 'N-Week Window (days)', type: 'number', default: 252, min: 1 },
-        { key: 'within_days', label: 'Occurred within last (days)', type: 'number', default: 20, min: 1 },
-      ],
-    },
-  };
+// ── REMOVED ──────────────────────────────────────────────────────────────────
+// INDICATORS and INDICATOR_META have been removed from this file.
+// All indicator metadata now comes from the API via useIndicatorRegistry().
+// See src/context/IndicatorRegistry.tsx.
+// ─────────────────────────────────────────────────────────────────────────────

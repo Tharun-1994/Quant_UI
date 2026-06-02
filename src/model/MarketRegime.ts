@@ -85,16 +85,25 @@ export interface MarketRegime {
   market_trend_rules_tree ?: RuleTree;
 
   is_look_inside_bar?: boolean;
+    /**
+   * If true, all open positions belonging to THIS regime are force-closed at
+   * next open when the market trend shifts away from this regime.
+   * If false (default), positions are left to exit through normal signals
+   * (RSI, stop loss, etc.) even after the regime flips.
+   *
+   * Matches Python QAS behavior: false everywhere.
+   */
+  close_positions_on_regime_exit?: boolean;
 
-   sector_level?: number;
-   sector_limit?: number;
+  sector_level?: number;
+  sector_limit?: number;
 
-    gap_filter_pct?: number;
+  gap_filter_pct?: number;
 
-    max_duplicates?: number;
-    max_duplicate_sets?: number;
-    tdom_filters?: TdomFilter[];
-    vol_filter?: VolFilter | null;
+  max_duplicates?: number;
+  max_duplicate_sets?: number;
+  tdom_filters?: TdomFilter[];
+  vol_filter?: VolFilter | null;
 }
 
 export interface TdomFilter {

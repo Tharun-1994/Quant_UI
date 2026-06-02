@@ -2,12 +2,11 @@ import React, { useEffect, useMemo } from "react";
 import type { Rule, RuleTree, RuleNode, Logic } from "../model/MarketRegime";
 
 import {
-  INDICATORS,
   OPERATORS,
   COMPARISON_TYPES,
-  MARKET_INDICATORS,
-  INDICATOR_META,
+  UNIVERSES,
 } from "../constants/options.ts";
+import { useIndicatorRegistry } from "../context/IndicatorRegistry.tsx";
 
 // ---------- helpers ----------
 const uid = () =>
@@ -62,8 +61,15 @@ function deleteNode(root: RuleNode, id: string): RuleNode {
 function ruleToExpr(r: Rule): string {
   if (!r.indicator) return "";
 
-  const meta = INDICATOR_META[r.indicator];
-  const isBoolean = meta?.kind === "boolean";
+  // month_in: calendar rule — show "month in [5, 6]"
+  if (r.operator === "month_in") {
+    const months = r.label && r.label.trim() !== "" ? r.label : String(r.value);
+    return `month in [${months}]`;
+  }
+
+  // ruleToExpr is used only for the legacy expression preview string (not the pill display)
+  // It doesn't have access to the registry hook, so we use a simple boolean check
+  const isBoolean = r.value_type === "value" && r.operator === "IS_TRUE";
 
   // ✅ N-week occurrence / boolean indicators use params
   if (isBoolean) {
@@ -76,12 +82,13 @@ function ruleToExpr(r: Rule): string {
   }
 
   // existing logic for normal indicators
-  if (!r.operator && r.value_type !== "top_n") return "";
+  if (!r.operator && r.value_type !== "top_n" && r.value_type !== "top_n_universe") return "";
   const left = `${r.indicator}_${r.lookback ?? 0}`;
 
   const vt = r.value_type || (r.value > 0 ? "value" : "indicator_price");
 
   if (vt === "top_n") return `${left} TOP ${Number(r.value)} (${r.ranking_order === "Ascending" ? "lowest" : "highest"})`;
+  if (vt === "top_n_universe") return `${left} TOP ${Number(r.value)} in universe (${r.ranking_order === "Ascending" ? "lowest" : "highest"})`;
   if (vt === "value") return `${left} ${r.operator} ${Number(r.value)}`;
 
   const right = r.value_indicator ? `${r.value_indicator}_${r.value_lookback ?? 0}` : "???";
@@ -89,7 +96,7 @@ function ruleToExpr(r: Rule): string {
 }
 
 
-function nodeToExpr(node: RuleNode): string {
+export function nodeToExpr(node: RuleNode): string {
   console.log("nodeToExpr", node);
   if (node.type === "rule") return ruleToExpr(node.rule);
 
@@ -119,8 +126,9 @@ type Props = {
 
 const RulesTreeEditor: React.FC<Props> = ({ label, tree, onChange, showPreview = true, indicators, marketIndicators, tickerOptions }) => {
 
-  const _indicators = indicators ?? INDICATORS;
-  const _marketIndicators = marketIndicators ?? MARKET_INDICATORS;
+  // Indicator lists come from props (populated by caller via useIndicatorRegistry)
+  const _indicators = indicators ?? {};
+  const _marketIndicators = marketIndicators ?? {};
   // bootstrap: if undefined, create a default root
 //   useEffect(() => {
 //     if (!tree) onChange(emptyRootTree());
@@ -232,6 +240,238 @@ const RulesTreeEditor: React.FC<Props> = ({ label, tree, onChange, showPreview =
     </div>
   );
 };
+
+// ── Template E: Pill Tree display ────────────────────────────────────────────
+
+// ── S2 Rule Display ───────────────────────────────────────────────────────────
+// Dark background. Each rule: dot · LHS  OP  RHS on one line.
+// Dot colour = green (AND) or amber (OR).
+// Operator colour = amber — pops clearly between green LHS and blue RHS.
+// Rank rules use ↓ operator + purple value.
+// Nested groups indent under a matching coloured left border.
+
+type RuleItem = {
+  indicator: string;    // LHS — what is being measured
+  op:        string;    // operator — > < ≥ ≤ = ↓
+  value:     string;    // RHS — threshold or compared-to indicator
+  valueKind: "rhs" | "rank" | "boolean";  // controls RHS colour
+};
+
+function buildRuleItem(
+  r: Rule,
+  labelFn?: (k: string, lb?: number) => string,
+  regMeta?: Record<string, any>
+): RuleItem | null {
+  if (!r.indicator) return null;
+
+  const meta      = regMeta?.[r.indicator];
+  const isBoolean = meta?.kind === "boolean";
+  const vt        = r.value_type || (r.value > 0 ? "value" : "indicator_price");
+  const hasLB     = meta?.has_lookback ?? true;
+
+  // Base indicator label e.g. "Close price" or "SMA(175)"
+  const indBase = labelFn
+    ? labelFn(r.indicator, hasLB ? r.lookback : undefined)
+    : r.indicator;
+
+  // If rule has a ticker context (market trend rules: SPY, VIX, GLD),
+  // append it so the user knows exactly which instrument is being measured.
+  // e.g. "Close price" → "Close price (SPY)"
+  const ticker = r.regime_ticker ? r.regime_ticker.toUpperCase() : null;
+  const ind    = ticker ? `${indBase} (${ticker})` : indBase;
+
+  const SYM: Record<string, string> = {
+    ">": ">", "<": "<", ">=": "≥", "<=": "≤", "==": "=",
+    month_in: "in months",
+  };
+
+  // month_in operator — special pill: "Month of year  in months  5, 6"
+  if (r.operator === "month_in") {
+    const months = r.label && r.label.trim() !== ""
+      ? r.label
+      : String(r.value);
+    return { indicator: "Month", op: "in", value: months, valueKind: "rhs" };
+  }
+
+  if (isBoolean) {
+    return { indicator: ind, op: "is", value: "true", valueKind: "boolean" };
+  }
+  if (vt === "top_n" || vt === "top_n_universe") {
+    const dir    = r.ranking_order === "Ascending" ? "bottom" : "top";
+    const suffix = vt === "top_n_universe" ? " of universe" : "";
+    return { indicator: ind, op: "↓", value: `${dir} ${Number(r.value)}${suffix}`, valueKind: "rank" };
+  }
+  if (vt === "value") {
+    return { indicator: ind, op: SYM[r.operator] ?? r.operator, value: String(Number(r.value)), valueKind: "rhs" };
+  }
+  if (vt === "indicator_price") {
+    const vMeta   = regMeta?.[r.value_indicator ?? ""];
+    const hasVLB  = vMeta?.has_lookback ?? true;
+    // Base RHS label e.g. "SMA(175)"
+    const valBase = labelFn
+      ? labelFn(r.value_indicator ?? "", hasVLB ? r.value_lookback : undefined)
+      : (r.value_indicator ?? "");
+    // Apply same ticker context to the RHS — both sides of a market trend
+    // rule refer to the same instrument.
+    // e.g. "SMA(175)" → "SMA(175) (SPY)"
+    const val = ticker ? `${valBase} (${ticker})` : valBase;
+    return { indicator: ind, op: SYM[r.operator] ?? r.operator, value: val, valueKind: "rhs" };
+  }
+  return null;
+}
+
+// One rule row: dot · LHS  OP  RHS
+function S2RuleRow({
+  item,
+  isAnd,
+}: {
+  item: RuleItem;
+  isAnd: boolean;
+}) {
+  const dotColor  = isAnd ? "#5DCAA5" : "#EF9F27";
+  const rhsColor  = item.valueKind === "rank"
+    ? "#AFA9EC"
+    : item.valueKind === "boolean"
+    ? "#5DCAA5"
+    : "#85B7EB";
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "7px", fontFamily: "var(--font-mono)", fontSize: "12px", lineHeight: 1 }}>
+      {/* coloured dot */}
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: dotColor, flexShrink: 0, display: "inline-block" }} />
+      {/* LHS — green */}
+      <span style={{ color: "#9FE1CB", fontWeight: 500 }}>{item.indicator}</span>
+      {/* operator — amber, pops between LHS and RHS */}
+      <span style={{ color: "#EF9F27", fontWeight: 600, fontSize: 13, margin: "0 1px" }}>{item.op}</span>
+      {/* RHS — blue / purple / green depending on kind */}
+      <span style={{ color: rhsColor, fontWeight: 500 }}>{item.value}</span>
+    </div>
+  );
+}
+
+// Recursive node renderer
+function S2Node({
+  node,
+  isRootAnd = true,
+  labelFn,
+  regMeta,
+}: {
+  node: RuleNode;
+  isRootAnd?: boolean;
+  labelFn?: (k: string, lb?: number) => string;
+  regMeta?: Record<string, any>;
+}) {
+  if (node.type === "rule") {
+    const item = buildRuleItem(node.rule, labelFn, regMeta);
+    if (!item) return null;
+    return <S2RuleRow item={item} isAnd={isRootAnd} />;
+  }
+
+  const isAnd       = node.logic === "AND";
+  const borderColor = isAnd ? "#5DCAA550" : "#EF9F2750";
+  const borderStyle = isAnd ? "solid" : "dashed";
+  const labelColor  = isAnd ? "#5DCAA5" : "#EF9F27";
+  const labelText   = isAnd ? "all must pass" : "any one passes";
+
+  return (
+    <div>
+      {/* tiny logic label */}
+      <div style={{ fontSize: 9, fontWeight: 500, color: labelColor, letterSpacing: ".08em", paddingBottom: 3, paddingLeft: 2 }}>
+        {labelText}
+      </div>
+      {/* children with coloured left border */}
+      <div style={{
+        paddingLeft: 10,
+        borderLeft: `1.5px ${borderStyle} ${borderColor}`,
+        marginLeft: 2,
+        display: "flex",
+        flexDirection: "column",
+        gap: 3,
+      }}>
+        {node.children.map((child) => (
+          <S2Node
+            key={child.id}
+            node={child}
+            isRootAnd={isAnd}
+            labelFn={labelFn}
+            regMeta={regMeta}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// UNIVERSES imported from options.ts — no local copy needed
+
+/**
+ * RulePillsDisplay — S2 style.
+ * Dark panel. Each rule on one line: dot · LHS  OP  RHS
+ * Operator in amber so it pops between green LHS and blue RHS.
+ * AND = green dot + solid border. OR = amber dot + dashed border.
+ *
+ * Props:
+ *   tree     — the rule tree to display
+ *   universe — optional universe key (e.g. "liquid500", "sp500").
+ *              When provided, shows a context header so a non-engineer
+ *              knows which stocks the rules are applied to.
+ *              Pass for entry/exit rules. Omit for market trend rules
+ *              (those already show the ticker on each rule line).
+ */
+export const RulePillsDisplay: React.FC<{
+  tree?: RuleTree;
+  universe?: string;
+}> = ({ tree, universe }) => {
+  const { labelFor, registry } = useIndicatorRegistry();
+  if (!tree || tree.children.length === 0) return null;
+
+  // Resolve universe label — handle comma-separated ETF lists e.g. "SPY,GLD"
+  const universeLabel = (() => {
+    if (!universe) return null;
+    const trimmed = universe.trim();
+    if (!trimmed) return null;
+    // Named universe key (sp500, liquid500, russell3000)
+    if (UNIVERSES[trimmed]) return UNIVERSES[trimmed];
+    // Individual ETF list — show tickers directly e.g. "SPY, GLD"
+    const tickers = trimmed.split(",").map((t) => t.trim().toUpperCase()).filter(Boolean);
+    if (tickers.length > 0) return tickers.join(", ");
+    return null;
+  })();
+
+  return (
+    <div style={{ background: "#1e2228", borderRadius: 6, padding: "7px 10px" }}>
+      {/* Context header — tells non-engineers which stocks these rules apply to */}
+      {universeLabel && (
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 5,
+          marginBottom: 6,
+          paddingBottom: 5,
+          borderBottom: "0.5px solid #ffffff10",
+        }}>
+          <span style={{ fontSize: 9, color: "#5F5E5A", letterSpacing: ".06em", textTransform: "uppercase" }}>
+            applies to each stock in
+          </span>
+          <span style={{
+            fontSize: 10,
+            fontWeight: 500,
+            color: "#9FE1CB",
+            background: "#0F3D2C",
+            padding: "1px 7px",
+            borderRadius: 4,
+            border: "0.5px solid #5DCAA530",
+            fontFamily: "var(--font-mono)",
+          }}>
+            {universeLabel}
+          </span>
+        </div>
+      )}
+      <S2Node node={tree} isRootAnd={tree.logic === "AND"} labelFn={labelFor} regMeta={registry} />
+    </div>
+  );
+};
+
 
 export default RulesTreeEditor;
 
@@ -371,16 +611,101 @@ function RuleRow({
   _marketIndicators: Record<string, string>;
   tickerOptions?: Record<string, string>;
 }) {
+  const { registry } = useIndicatorRegistry();
+  const getMeta = (key: string) => {
+    const r = registry[key];
+    if (!r) return null;
+    return {
+      hasLookback:     r.has_lookback,
+      kind:            r.kind ?? null,
+      hasRange:        r.has_range ?? false,
+      params:          r.params ?? [],
+      defaultLookback: r.default_lookback,
+    };
+  };
+
   const valueType = rule.value_type || (rule.value > 0 ? "value" : "indicator_price");
 
-  const meta = INDICATOR_META[rule.indicator];
+  const meta = getMeta(rule.indicator);
   const isBoolean = meta?.kind === "boolean";
+  // month_in: calendar-based operator — no RHS indicator/value fields needed
+  const isMonthIn = rule.operator === "month_in";
   const params = rule.params || {};
 
   return (
-    <div className={`bg-white border border-gray-200 rounded-lg shadow-sm p-4 grid grid-cols-1 ${tickerOptions ? "sm:grid-cols-7" : "sm:grid-cols-6"} gap-4 items-end`}>
-      {/* Ticker — only for market trend rules */}
-      {tickerOptions && (
+    <>
+    {isMonthIn ? (
+    <div className="bg-white border border-gray-200 rounded-lg shadow-sm px-3 py-2 flex flex-wrap items-center gap-3">
+      <div className="flex items-center gap-2">
+        <label className="text-xs font-semibold text-gray-500 whitespace-nowrap">Indicator</label>
+        <select
+          value={rule.indicator}
+          onChange={(e) => {
+            const selected = e.target.value;
+            const nextMeta = getMeta(selected);
+            const nextIsBoolean = nextMeta?.kind === "boolean";
+            const nextParams: Record<string, any> = {};
+            (nextMeta?.params || []).forEach((p: any) => { nextParams[p.key] = p.default ?? ""; });
+            onChange({
+              ...rule,
+              indicator: selected,
+              lookback: selected === "crsi" ? 2 : (nextMeta?.defaultLookback ?? 0),
+              operator: selected === "month" ? "month_in" : nextIsBoolean ? "IS_TRUE" : rule.operator === "month_in" ? "" : rule.operator,
+              value_type: (selected === "month" || nextIsBoolean) ? "value" : rule.value_type,
+              value: nextIsBoolean ? 1 : rule.value,
+              label: selected === "month" ? (rule.label || "") : (rule.operator === "month_in" ? "" : rule.label),
+              value_indicator: (selected === "month" || nextIsBoolean) ? "" : rule.value_indicator,
+              value_lookback: (selected === "month" || nextIsBoolean) ? 0 : rule.value_lookback,
+              params: (nextMeta?.params?.length ? nextParams : undefined),
+            });
+          }}
+          className="border px-2 py-1 rounded text-xs focus:ring focus:ring-indigo-200"
+        >
+          <option value="">-- Select --</option>
+          {Object.entries(_indicators).map(([key, lbl]) => (
+            <option key={key} value={key}>{lbl as string}</option>
+          ))}
+        </select>
+      </div>
+      <div className="flex items-center gap-2">
+        <label className="text-xs font-semibold text-gray-500 whitespace-nowrap">Operator</label>
+        <select value={rule.operator} onChange={(e) => onChange({ ...rule, operator: e.target.value })}
+          className="border px-2 py-1 rounded text-xs focus:ring focus:ring-indigo-200">
+          <option value="month_in">month in</option>
+        </select>
+      </div>
+      <div className="flex items-center gap-2 flex-1">
+        <label className="text-xs font-semibold text-gray-500 whitespace-nowrap">Months</label>
+        <input type="text" value={rule.label || ""} placeholder="5,6  (May=5, Jun=6)"
+          onChange={(e) => onChange({ ...rule, label: e.target.value })}
+          className="border border-yellow-400 bg-yellow-50 px-2 py-1 rounded text-xs focus:ring focus:ring-yellow-300 w-44" />
+        <span className="text-xs text-gray-400 whitespace-nowrap">1=Jan … 12=Dec</span>
+      </div>
+      <button type="button" onClick={onRemove} className="text-red-500 text-xs hover:underline ml-auto">Remove</button>
+    </div>
+    ) : (
+    <div className={`bg-white border border-gray-200 rounded-lg shadow-sm p-4 grid grid-cols-1 ${tickerOptions ? "sm:grid-cols-8" : "sm:grid-cols-6"} gap-4 items-end`}>
+      {/* Regime Label — only for market trend rules (becomes the regime's unique key in backend).
+          Hidden for month_in because calendar rules don't need a label. */}
+      {tickerOptions && !isMonthIn && (
+      <div>
+        <label className="block text-xs font-semibold text-gray-600 mb-1">
+          Label <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="text"
+          value={rule.label || ""}
+          placeholder="bull / bear"
+          title='Unique per regime (e.g. "bull", "bear", "vol", "non_vol"). Required — empty labels cause regime collisions.'
+          onChange={(e) => onChange({ ...rule, label: e.target.value })}
+          className={`w-full border px-2 py-1 rounded focus:ring focus:ring-indigo-200 ${
+            !rule.label ? "border-red-400 bg-red-50" : "border-gray-300"
+          }`}
+        />
+      </div>
+      )}
+      {/* Ticker — only for market trend / volatility rules; hidden for month_in (calendar-only) */}
+      {tickerOptions && !isMonthIn && (
       <div>
         <label className="block text-xs font-semibold text-gray-600 mb-1">Ticker</label>
         <select
@@ -402,7 +727,7 @@ function RuleRow({
           value={rule.indicator}
             onChange={(e) => {
             const selected = e.target.value;
-            const nextMeta = INDICATOR_META[selected];
+            const nextMeta = getMeta(selected);
             const nextIsBoolean = nextMeta?.kind === "boolean";
 
             // build default params if defined in meta
@@ -417,13 +742,19 @@ function RuleRow({
 
               lookback: selected === "crsi" ? 2 : (nextMeta?.defaultLookback ?? 0),
 
-              operator: nextIsBoolean ? "IS_TRUE" : rule.operator,
-              value_type: nextIsBoolean ? "value" : rule.value_type,
+              // Auto-set operator and clear stale fields for month indicator
+              operator: selected === "month" ? "month_in"
+                      : nextIsBoolean ? "IS_TRUE"
+                      : rule.operator === "month_in" ? "" // clear month_in if switching away
+                      : rule.operator,
+              value_type: (selected === "month" || nextIsBoolean) ? "value" : rule.value_type,
               value: nextIsBoolean ? 1 : rule.value,
+              // Clear label when switching away from month
+              label: selected === "month" ? (rule.label || "") : (rule.operator === "month_in" ? "" : rule.label),
 
               // ✅ CLEAR stale compare fields so "unadjusted_close" doesn't leak in
-              value_indicator: nextIsBoolean ? "" : rule.value_indicator,
-              value_lookback: nextIsBoolean ? 0 : rule.value_lookback,
+              value_indicator: (selected === "month" || nextIsBoolean) ? "" : rule.value_indicator,
+              value_lookback: (selected === "month" || nextIsBoolean) ? 0 : rule.value_lookback,
 
               // optional: if you have label/connector etc you can keep them
               params: (nextMeta?.params?.length ? nextParams : undefined),
@@ -445,7 +776,7 @@ function RuleRow({
       </div>
 
       {/* Lookback */}
-      {(INDICATOR_META[rule.indicator]?.hasLookback ?? true) && (
+      {!isMonthIn && (getMeta(rule.indicator)?.hasLookback ?? true) && (
         <div>
           <label className="block text-xs font-semibold text-gray-600 mb-1">Lookback</label>
           <input
@@ -566,8 +897,8 @@ function RuleRow({
       )} */}
         {!isBoolean ? (
         <>
-            {/* Operator — hidden for top_n */}
-            {valueType !== "top_n" && (
+            {/* Operator — hidden for top_n and top_n_universe */}
+            {valueType !== "top_n" && valueType !== "top_n_universe" && (
             <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Operator</label>
             <select
@@ -585,6 +916,22 @@ function RuleRow({
             </div>
             )}
 
+            {/* month_in: show Months list field instead of normal RHS */}
+            {isMonthIn ? (
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-semibold text-gray-600 mb-1">
+                Months <span className="text-gray-400 font-normal">(comma-separated, e.g. 5,6 = May, Jun)</span>
+              </label>
+              <input
+                type="text"
+                value={rule.label || ""}
+                placeholder="5,6"
+                onChange={(e) => onChange({ ...rule, label: e.target.value })}
+                className="w-full border border-yellow-400 px-2 py-1 rounded focus:ring focus:ring-yellow-300 bg-yellow-50"
+              />
+            </div>
+            ) : (
+            <>
             {/* Value Type */}
             <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Value Type</label>
@@ -593,7 +940,7 @@ function RuleRow({
                 onChange={(e) => {
                   const newType = e.target.value;
                   const updates: Partial<Rule> = { value_type: newType };
-                  if (newType === "top_n") {
+                  if (newType === "top_n" || newType === "top_n_universe") {
                     updates.operator = "top";
                     updates.ranking_order = "Descending";
                     updates.value = rule.value || 100;
@@ -619,8 +966,8 @@ function RuleRow({
             </select>
             </div>
 
-            {/* ── Top N fields ── */}
-            {valueType === "top_n" && (
+            {/* ── Top N fields (shown for both top_n and top_n_universe) ── */}
+            {(valueType === "top_n" || valueType === "top_n_universe") && (
             <>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Top N</label>
@@ -678,7 +1025,7 @@ function RuleRow({
             </div>
             )}
 
-            {valueType === "indicator_price" && (INDICATOR_META[rule.value_indicator]?.hasLookback ?? true) && (
+            {valueType === "indicator_price" && (getMeta(rule.value_indicator ?? "")?.hasLookback ?? true) && (
             <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Lookback</label>
                 <input
@@ -690,7 +1037,7 @@ function RuleRow({
             </div>
             )}
             {/* Compare To Range % */}
-            {valueType === "indicator_price" && (INDICATOR_META[rule.value_indicator]?.hasRange ?? false) && (
+            {valueType === "indicator_price" && (getMeta(rule.value_indicator ?? "")?.hasRange ?? false) && (
             <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Range %</label>
                 <input
@@ -701,7 +1048,8 @@ function RuleRow({
                 />
             </div>
             )}
-
+            </> /* end isMonthIn else */
+            )} {/* end isMonthIn ternary */}
 
         </>
         ) : (
@@ -717,5 +1065,7 @@ function RuleRow({
         </button>
       </div>
     </div>
+    )} {/* end isMonthIn ternary */}
+    </>
   );
 }
