@@ -23,6 +23,30 @@ export type RuleNode =
 
 export type RuleTree = Extract<RuleNode, { type: "group" }>;
 
+/** One stateful safety-net policy attached to a regime.
+ *
+ *  `type` selects which engine-side policy class will consume this item.
+ *  `params` is a free-form blob whose shape each policy validates on its own.
+ *
+ *  Example — simple freeze/resume:
+ *    { type: "simple",
+ *      params: {
+ *        freeze_rules_tree: {...}, resume_rules_tree: {...},
+ *        freeze_timing: "open",   resume_timing: "open"
+ *      } }
+ *
+ *  Example — SPY volatility (Stage 3c):
+ *    { type: "spy_volatility",
+ *      params: {
+ *        vol_ticker: "SPY", vol_lookback: 5, vol_threshold: 0.025,
+ *        timeout_days: 20, selloff_pct: 0.20,
+ *        peak_drop_pct: 0.80, rearm_pct: 0.80
+ *      } }
+ */
+export interface SafetyNetItem {
+  type: string;
+  params: Record<string, any>;
+}
 // src/model/MarketRegime.ts
 export interface MarketRegime {
   id?: number;
@@ -82,6 +106,15 @@ export interface MarketRegime {
   freeze_rules_tree ?: RuleTree;
   resume_rules_tree ?: RuleTree;
 
+  freeze_timing ?: string;
+  resume_timing ?: string;
+  /** Volatility safety net type.
+   *   "none"           — no safety net (default)
+   *   "simple"         — freeze/resume rule trees drive behaviour
+   *   "spy_volatility" — stateful 4-escape model (Stage 3) */
+  safety_net_type ?: string;
+
+  safety_nets ?: SafetyNetItem[];
   market_trend_rules_tree ?: RuleTree;
 
   is_look_inside_bar?: boolean;

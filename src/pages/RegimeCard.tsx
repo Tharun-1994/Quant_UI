@@ -1,5 +1,5 @@
 import React, { use, useEffect, useMemo, useRef, useState } from "react";
-import { MarketRegime, RuleTree, TdomFilter, VolFilter } from "../model/MarketRegime";
+import { MarketRegime, RuleTree, SafetyNetItem, TdomFilter, VolFilter } from "../model/MarketRegime";
 import {
   INDEX_TICKERS,
   ORDER_TYPE,
@@ -7,7 +7,7 @@ import {
   TAKEPROFIT_TYPE,
   RISK_TIMING,
   RANKING_ORDERS,
-
+  SAFETY_NET_TYPES,
   UNIVERSES,
   SIGNAL_TIMING,
   REBALANCE,
@@ -29,7 +29,7 @@ type ActiveEditor =
   | "entry"
   | "exit"
   | "market_trend"
-  | "freeze_resume"
+  | "safety_net"
   // risk param editors (narrower modal)
   | "stoploss"
   | "takeprofit"
@@ -109,15 +109,26 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
     () => regime.exit_rules_tree ?? makeEmptyTree()
   );
 
-  const [freezeRulesTree, setFreezeRulesTree] = useState<RuleTree>(
-    () => (regime as any).freeze_rules_tree ?? makeEmptyTree()
-  );
-  const [resumeRulesTree, setResumeRulesTree] = useState<RuleTree>(
-    () => (regime as any).resume_rules_tree ?? makeEmptyTree()
-  );
-  const [useFreezeUnFreezeCheck, setUseFreezeUnFreezeCheck] = useState<boolean>(
-    () => ((regime as any).freeze_rules_tree?.children?.length ?? 0) > 0
-  );
+  const [safetyNets, setSafetyNets] = useState<SafetyNetItem[]>(() => {
+    const r: any = regime;
+    if (Array.isArray(r.safety_nets) && r.safety_nets.length > 0) {
+      return r.safety_nets;
+    }
+    const legacyType = (r.safety_net_type || "none").toLowerCase();
+    if (legacyType === "none") return [];
+    if (legacyType === "simple") {
+      return [{
+        type: "simple",
+        params: {
+          freeze_rules_tree:  r.freeze_rules_tree  ?? makeEmptyTree(),
+          resume_rules_tree:  r.resume_rules_tree  ?? makeEmptyTree(),
+          freeze_timing:      r.freeze_timing      || "open",
+          resume_timing:      r.resume_timing      || "open",
+        },
+      }];
+    }
+    return [{ type: legacyType, params: {} }];
+  });
 
   const isIndividualEtfSimple =
     regime.regime_type === "Individual ETFs - Simple";
@@ -179,8 +190,6 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
   useEffect(() => {
     setEntryTree(regime.entry_rules_tree ?? makeEmptyTree());
     setExitTree(regime.exit_rules_tree ?? makeEmptyTree());
-    setFreezeRulesTree(regime.freeze_rules_tree ?? makeEmptyTree());
-    setResumeRulesTree(regime.resume_rules_tree ?? makeEmptyTree());
     setMarketTrendRulesTree(regime.market_trend_rules_tree ?? makeEmptyTree());
   }, [regime.id]);
 
@@ -197,20 +206,19 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
   // Bug 4 fix: only propagate trees when the freeze toggle is ON.
   // When OFF, send null so the engine receives no freeze/resume rules.
   useEffect(() => {
+    const firstSimple = safetyNets.find((sn) => sn.type === "simple");
     onUpdate({
       ...regime,
-      freeze_rules_tree: useFreezeUnFreezeCheck ? freezeRulesTree : undefined,
+      safety_nets: safetyNets,
+      safety_net_type: safetyNets.length > 0 ? safetyNets[0].type : "none",
+      // Back-compat mirror — first simple's trees & timings into regime-level fields
+      freeze_rules_tree: firstSimple?.params?.freeze_rules_tree,
+      resume_rules_tree: firstSimple?.params?.resume_rules_tree,
+      freeze_timing:      firstSimple?.params?.freeze_timing || "open",
+      resume_timing:      firstSimple?.params?.resume_timing || "open",
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [freezeRulesTree, useFreezeUnFreezeCheck]);
-
-  useEffect(() => {
-    onUpdate({
-      ...regime,
-      resume_rules_tree: useFreezeUnFreezeCheck ? resumeRulesTree : undefined,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resumeRulesTree, useFreezeUnFreezeCheck]);
+  }, [safetyNets]);
 
   useEffect(() => {
     onUpdate({ ...regime, market_trend_rules_tree: marketTrendRulesTree });
@@ -231,8 +239,8 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
         return { title: "Edit Exit Rules", maxWidth: "1024px" };
       case "market_trend":
         return { title: "Edit Market Trend Rules", maxWidth: "1024px" };
-      case "freeze_resume":
-        return { title: "Edit Volatility Cut Rules", maxWidth: "1024px" };
+      case "safety_net":
+        return { title: "Edit Safety Net", maxWidth: "1024px" };
       case "stoploss":
         return { title: "Edit Stoploss", maxWidth: "480px" };
       case "takeprofit":
@@ -676,52 +684,49 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
                   );
                 })()}
 
-              {/* Volatility Cut Rules overview */}
+{/* Safety Nets overview (list of stateful policies) */}
               <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
                 <div className="flex items-start justify-between gap-3 mb-2">
                   <div className="min-w-0">
-                    <h5 className="text-sm font-bold text-yellow-800">
-                      ⚡ Volatility Cut Rules
-                    </h5>
+                    <div className="flex items-center gap-2">
+                      <h5 className="text-sm font-bold text-yellow-800">
+                        🛡 Safety Nets
+                      </h5>
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-yellow-100 text-yellow-900">
+                        {safetyNets.length === 0 ? "none" : `${safetyNets.length} active`}
+                      </span>
+                    </div>
                     <p className="text-xs text-yellow-900/70 mt-0.5">
-                      Cut trades during volatility conditions and resume when
-                      they clear.
+                      All checks run each day — any one says freeze, the strategy freezes.
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={useFreezeUnFreezeCheck}
-                        onChange={(e) =>
-                          setUseFreezeUnFreezeCheck(e.target.checked)
-                        }
-                        className="h-4 w-4 rounded border-gray-300 text-yellow-600 focus:ring-yellow-300"
-                      />
-                      <span className="text-xs font-semibold text-yellow-900">
-                        {useFreezeUnFreezeCheck ? "ON" : "OFF"}
-                      </span>
-                    </label>
-                    {useFreezeUnFreezeCheck && (
-                      <button
-                        type="button"
-                        onClick={() => setActiveEditor("freeze_resume")}
-                        className="px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition whitespace-nowrap"
-                      >
-                        ✏ Edit
-                      </button>
-                    )}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveEditor("safety_net")}
+                    className="px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 transition whitespace-nowrap shrink-0"
+                  >
+                    ✏ Edit
+                  </button>
                 </div>
-                {!useFreezeUnFreezeCheck ? (
+                {safetyNets.length === 0 ? (
                   <p className="text-xs text-gray-700 italic">
-                    Disabled. The strategy will trade normally.
+                    No safety nets. The strategy trades freely regardless of market conditions.
                   </p>
                 ) : (
-                  <p className="text-xs text-gray-700">
-                    Freeze: {summarizeTree(freezeRulesTree).count} rule(s) ·
-                    Resume: {summarizeTree(resumeRulesTree).count} rule(s)
-                  </p>
+                  <div className="flex flex-col gap-2 mt-1">
+                    {safetyNets.map((sn, idx) => {
+                      const label = SAFETY_NET_TYPES[sn.type] || sn.type;
+                      return (
+                        <div key={idx} className="flex items-center gap-2 text-xs">
+                          <span className="font-semibold text-yellow-900/60 w-4">{idx + 1}</span>
+                          <span className="font-semibold px-2 py-0.5 rounded bg-yellow-200/60 text-yellow-900 uppercase tracking-wide">
+                            {sn.type}
+                          </span>
+                          <span className="text-gray-700 truncate">{label}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
 
@@ -791,48 +796,44 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
 
 
 
-              {/* Entry/Exit Timing */}
-              <div className="bg-blue-50 rounded-lg p-4 border">
-                <h5 className="text-sm font-bold text-blue-800 mb-3">
-                  ⏱ Entry / Exit Timing
-                </h5>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                      Entry Timing<span className="text-red-600">*</span>
+              {/* Entry/Exit Timing — single row */}
+              <div className="bg-blue-50 rounded-lg px-3 py-2.5 border">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-semibold text-blue-800 shrink-0">
+                    ⏱ Timing
+                  </span>
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <label className="text-xs font-medium text-gray-600 shrink-0">
+                      Entry<span className="text-red-500">*</span>
                     </label>
                     <select
                       value={regime.entry_timing || ""}
                       onChange={(e) =>
                         onUpdate({ ...regime, entry_timing: e.target.value })
                       }
-                      className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-blue-200"
+                      className="flex-1 min-w-0 px-2 py-1 text-xs border rounded-md focus:ring focus:ring-blue-200 bg-white"
                     >
-                      <option value="">-- Select Entry Timing --</option>
+                      <option value="">-- Select --</option>
                       {Object.entries(SIGNAL_TIMING).map(([key, label]) => (
-                        <option key={key} value={key}>
-                          {label}
-                        </option>
+                        <option key={key} value={key}>{label}</option>
                       ))}
                     </select>
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                      Exit Timing<span className="text-red-600">*</span>
+                  <div className="w-px h-4 bg-blue-200 shrink-0" />
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <label className="text-xs font-medium text-gray-600 shrink-0">
+                      Exit<span className="text-red-500">*</span>
                     </label>
                     <select
                       value={regime.exit_timing || ""}
                       onChange={(e) =>
                         onUpdate({ ...regime, exit_timing: e.target.value })
                       }
-                      className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-blue-200"
+                      className="flex-1 min-w-0 px-2 py-1 text-xs border rounded-md focus:ring focus:ring-blue-200 bg-white"
                     >
-                      <option value="">-- Select Exit Timing --</option>
+                      <option value="">-- Select --</option>
                       {Object.entries(SIGNAL_TIMING).map(([key, label]) => (
-                        <option key={key} value={key}>
-                          {label}
-                        </option>
+                        <option key={key} value={key}>{label}</option>
                       ))}
                     </select>
                   </div>
@@ -883,26 +884,365 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
             tickerOptions={INDEX_TICKERS}
           />
         )}
-        {activeEditor === "freeze_resume" && (
-          <div className="space-y-6">
-            <RulesTreeEditor
-              key="freeze-rules-editor"
-              label="Freeze Trading Rules"
-              tree={freezeRulesTree}
-              onChange={setFreezeRulesTree}
-              indicators={indicatorsFor(regime.regime_type, "volatility", "lhs")}
-              marketIndicators={indicatorsFor(regime.regime_type, "volatility", "lhs")}
-              tickerOptions={INDEX_TICKERS}
-            />
-            <RulesTreeEditor
-              key="unfreeze-rules-editor"
-              label="Resume Trading Rules"
-              tree={resumeRulesTree}
-              onChange={setResumeRulesTree}
-              indicators={indicatorsFor(regime.regime_type, "volatility", "lhs")}
-              marketIndicators={indicatorsFor(regime.regime_type, "volatility", "lhs")}
-              tickerOptions={INDEX_TICKERS}
-            />  
+{activeEditor === "safety_net" && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Add as many safety nets as you need. Each runs every day; any one
+              saying freeze stops trading.
+            </p>
+
+            {/* List of safety-net items */}
+            <div className="flex flex-col gap-3">
+              {safetyNets.length === 0 && (
+                <div className="p-4 bg-gray-50 border border-dashed border-gray-300 rounded-lg text-center">
+                  <p className="text-sm text-gray-600 italic">
+                    No safety nets configured. Click "Add safety net" below.
+                  </p>
+                </div>
+              )}
+
+              {safetyNets.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="bg-yellow-50/50 border border-yellow-200 rounded-lg p-4"
+                >
+                  {/* Item header — number badge, type dropdown, remove */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="w-7 h-7 rounded-full bg-yellow-200 text-yellow-900 text-sm font-bold flex items-center justify-center shrink-0">
+                      {idx + 1}
+                    </span>
+                    <select
+                      value={item.type}
+                      onChange={(e) => {
+                        const newType = e.target.value;
+                        // When changing type, swap default params for the new type
+                        const newParams = newType === "simple"
+                          ? { freeze_rules_tree: makeEmptyTree(),
+                              resume_rules_tree: makeEmptyTree(),
+                              freeze_timing: "open",
+                              resume_timing: "open" }
+                          : {};
+                        setSafetyNets((prev) =>
+                          prev.map((sn, i) =>
+                            i === idx ? { type: newType, params: newParams } : sn
+                          )
+                        );
+                      }}
+                      className="flex-1 px-3 py-2 border rounded-lg text-sm focus:ring focus:ring-indigo-200"
+                    >
+                      {Object.entries(SAFETY_NET_TYPES)
+                        .filter(([k]) => k !== "none")
+                        .map(([key, label]) => (
+                          <option key={key} value={key}>{label}</option>
+                        ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSafetyNets((prev) => prev.filter((_, i) => i !== idx))
+                      }
+                      className="px-2 py-1.5 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200 transition shrink-0"
+                      title="Remove this safety net"
+                    >
+                      🗑
+                    </button>
+                  </div>
+
+                  {/* Item body — conditional on type */}
+                  {item.type === "simple" && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 mb-1">
+                            Freeze Timing
+                          </label>
+                          <select
+                            value={item.params.freeze_timing || "open"}
+                            onChange={(e) =>
+                              setSafetyNets((prev) =>
+                                prev.map((sn, i) =>
+                                  i === idx
+                                    ? { ...sn, params: { ...sn.params, freeze_timing: e.target.value } }
+                                    : sn
+                                )
+                              )
+                            }
+                            className="w-full px-2 py-1.5 text-sm border rounded focus:ring focus:ring-yellow-200"
+                          >
+                            <option value="open">Open (decide yesterday, act today open)</option>
+                            <option value="close">Close (decide today, act today close)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 mb-1">
+                            Resume Timing
+                          </label>
+                          <select
+                            value={item.params.resume_timing || "open"}
+                            onChange={(e) =>
+                              setSafetyNets((prev) =>
+                                prev.map((sn, i) =>
+                                  i === idx
+                                    ? { ...sn, params: { ...sn.params, resume_timing: e.target.value } }
+                                    : sn
+                                )
+                              )
+                            }
+                            className="w-full px-2 py-1.5 text-sm border rounded focus:ring focus:ring-yellow-200"
+                          >
+                            <option value="open">Open (decide yesterday, act today open)</option>
+                            <option value="close">Close (decide today, act today close)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <RulesTreeEditor
+                        key={`freeze-${idx}`}
+                        label="Freeze Trading Rules"
+                        tree={item.params.freeze_rules_tree ?? makeEmptyTree()}
+                        onChange={(newTree) =>
+                          setSafetyNets((prev) =>
+                            prev.map((sn, i) =>
+                              i === idx
+                                ? { ...sn, params: { ...sn.params, freeze_rules_tree: newTree } }
+                                : sn
+                            )
+                          )
+                        }
+                        indicators={indicatorsFor(regime.regime_type, "volatility", "lhs")}
+                        marketIndicators={indicatorsFor(regime.regime_type, "volatility", "lhs")}
+                        tickerOptions={INDEX_TICKERS}
+                      />
+                      <RulesTreeEditor
+                        key={`resume-${idx}`}
+                        label="Resume Trading Rules"
+                        tree={item.params.resume_rules_tree ?? makeEmptyTree()}
+                        onChange={(newTree) =>
+                          setSafetyNets((prev) =>
+                            prev.map((sn, i) =>
+                              i === idx
+                                ? { ...sn, params: { ...sn.params, resume_rules_tree: newTree } }
+                                : sn
+                            )
+                          )
+                        }
+                        indicators={indicatorsFor(regime.regime_type, "volatility", "lhs")}
+                        marketIndicators={indicatorsFor(regime.regime_type, "volatility", "lhs")}
+                        tickerOptions={INDEX_TICKERS}
+                      />
+                    </div>
+                  )}
+
+                  {item.type === "spy_volatility" && (() => {
+                    // Default values match Python L_SMR_STATIC.
+                    // The engine has the same defaults; these are just UI fallbacks for fresh items.
+                    const p = item.params || {};
+                    const setParam = (k: string, v: any) =>
+                      setSafetyNets((prev) =>
+                        prev.map((sn, i) =>
+                          i === idx ? { ...sn, params: { ...sn.params, [k]: v } } : sn
+                        )
+                      );
+                    return (
+                      <div className="space-y-4">
+
+                        {/* Detection group */}
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                            Detection
+                          </p>
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-xs text-gray-700 mb-1">Vol ticker</label>
+                              <input
+                                type="text"
+                                value={p.vol_ticker ?? "SPY"}
+                                onChange={(e) => setParam("vol_ticker", e.target.value)}
+                                className="w-full px-2 py-1.5 text-sm border rounded focus:ring focus:ring-yellow-200"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-700 mb-1">Vol lookback (days)</label>
+                              <input
+                                type="number"
+                                step={1}
+                                min={2}
+                                value={p.vol_lookback ?? 5}
+                                onChange={(e) => setParam("vol_lookback", Number(e.target.value))}
+                                className="w-full px-2 py-1.5 text-sm border rounded focus:ring focus:ring-yellow-200"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-700 mb-1">Vol threshold</label>
+                              <input
+                                type="number"
+                                step={0.001}
+                                value={p.vol_threshold ?? 0.025}
+                                onChange={(e) => setParam("vol_threshold", Number(e.target.value))}
+                                className="w-full px-2 py-1.5 text-sm border rounded focus:ring focus:ring-yellow-200"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Escape routes group */}
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                            Escape routes
+                          </p>
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-xs text-gray-700 mb-1">Timeout (days)</label>
+                              <input
+                                type="number"
+                                step={1}
+                                min={1}
+                                value={p.timeout_days ?? 20}
+                                onChange={(e) => setParam("timeout_days", Number(e.target.value))}
+                                className="w-full px-2 py-1.5 text-sm border rounded focus:ring focus:ring-yellow-200"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-700 mb-1">Selloff pct</label>
+                              <input
+                                type="number"
+                                step={0.01}
+                                min={0}
+                                max={1}
+                                value={p.selloff_pct ?? 0.20}
+                                onChange={(e) => setParam("selloff_pct", Number(e.target.value))}
+                                className="w-full px-2 py-1.5 text-sm border rounded focus:ring focus:ring-yellow-200"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-700 mb-1">Peak drop pct</label>
+                              <input
+                                type="number"
+                                step={0.01}
+                                min={0}
+                                max={1}
+                                value={p.peak_drop_pct ?? 0.80}
+                                onChange={(e) => setParam("peak_drop_pct", Number(e.target.value))}
+                                className="w-full px-2 py-1.5 text-sm border rounded focus:ring focus:ring-yellow-200"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Re-entry group */}
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                            Re-entry
+                          </p>
+                          <div className="grid grid-cols-3 gap-3 items-start">
+                            <div>
+                              <label className="block text-xs text-gray-700 mb-1">Re-arm pct</label>
+                              <input
+                                type="number"
+                                step={0.01}
+                                min={0}
+                                max={1}
+                                value={p.rearm_pct ?? 0.80}
+                                onChange={(e) => setParam("rearm_pct", Number(e.target.value))}
+                                className="w-full px-2 py-1.5 text-sm border rounded focus:ring focus:ring-yellow-200"
+                              />
+                            </div>
+                            <div className="col-span-2 pt-1">
+                              <label className="inline-flex items-start gap-2 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={!!p.close_on_rearm}
+                                  onChange={(e) => setParam("close_on_rearm", e.target.checked)}
+                                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-yellow-600 focus:ring-yellow-300"
+                                />
+                                <span className="text-xs text-gray-700">
+                                  <span className="font-semibold">Close positions on re-arm</span>
+                                  <br />
+                                  <span className="text-gray-600">
+                                    More aggressive — diverges from Python default. Off keeps positions, they exit via RSI/stop-loss.
+                                  </span>
+                                </span>
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+                    );
+                  })()}
+                  {item.type === "spy_volatility_pause" && (() => {
+                    const p = item.params || {};
+                    const setParam = (k: string, v: any) =>
+                      setSafetyNets((prev) =>
+                        prev.map((sn, i) =>
+                          i === idx ? { ...sn, params: { ...sn.params, [k]: v } } : sn
+                        )
+                      );
+                    return (
+                      <div className="space-y-3">
+                        <p className="text-xs text-gray-600 italic">
+                          Pause new entries when SPY vol exceeds <code>multiple × rolling median of vol</code>.
+                          Existing positions are NOT closed — they exit via normal rules.
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs text-gray-700 mb-1">Vol ticker</label>
+                            <input type="text"
+                              value={p.vol_ticker ?? "SPY"}
+                              onChange={(e) => setParam("vol_ticker", e.target.value)}
+                              className="w-full px-2 py-1.5 text-sm border rounded focus:ring focus:ring-yellow-200" />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-700 mb-1">Vol lookback (days)</label>
+                            <input type="number" step={1} min={2}
+                              value={p.vol_lookback ?? 20}
+                              onChange={(e) => setParam("vol_lookback", Number(e.target.value))}
+                              className="w-full px-2 py-1.5 text-sm border rounded focus:ring focus:ring-yellow-200" />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-700 mb-1">Median lookback (days)</label>
+                            <input type="number" step={1} min={20}
+                              value={p.vol_median_lookback ?? 252}
+                              onChange={(e) => setParam("vol_median_lookback", Number(e.target.value))}
+                              className="w-full px-2 py-1.5 text-sm border rounded focus:ring focus:ring-yellow-200" />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-700 mb-1">Multiple</label>
+                            <input type="number" step={0.1} min={0.5}
+                              value={p.vol_multiple ?? 2.0}
+                              onChange={(e) => setParam("vol_multiple", Number(e.target.value))}
+                              className="w-full px-2 py-1.5 text-sm border rounded focus:ring focus:ring-yellow-200" />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                </div>
+              ))}
+            </div>
+
+            {/* Add button */}
+            <button
+              type="button"
+              onClick={() =>
+                setSafetyNets((prev) => [
+                  ...prev,
+                  {
+                    type: "simple",
+                    params: {
+                      freeze_rules_tree: makeEmptyTree(),
+                      resume_rules_tree: makeEmptyTree(),
+                      freeze_timing: "open",
+                      resume_timing: "open",
+                    },
+                  },
+                ])
+              }
+              className="w-full px-4 py-3 text-sm border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-indigo-400 hover:text-indigo-600 transition"
+            >
+              + Add safety net
+            </button>
           </div>
         )}
 
@@ -1206,7 +1546,7 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
                 className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-indigo-200"
               >
                 <option value="">-- Select --</option>
-                {Object.entries(indicatorsFor(regime.regime_type, "entry", "lhs")).map(([key, label]) => (
+                {Object.entries(indicatorsFor(regime.regime_type, "ranking", "lhs")).map(([key, label]) => (
                   <option key={key} value={key}>
                     {label}
                   </option>

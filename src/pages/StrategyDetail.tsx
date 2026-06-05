@@ -74,8 +74,12 @@ const StrategyDetail: React.FC<StrategyDetailProps> = ({ mode }) => {
       {tab === "marketRegime" && strategy && (
   <MarketRegimeTab strategy={strategy} />
 )}
-      {tab === "equity" && <EquityTab strategyId={id != null ? Number(id) : 0} />}
-      {tab === "performance" && <PerformanceTab strategyId={id != null ? Number(id) : 0} />}
+      {tab === "equity" && (
+        <EquityTab strategyId={strategy?.id ?? (id != null ? Number(id) : 0)} />
+      )}
+      {tab === "performance" && (
+        <PerformanceTab strategyId={strategy?.id ?? (id != null ? Number(id) : 0)} />
+      )}
       {/* {tab === "upload" && <UploadTab />} */}
       {tab === "download" && strategy && (
         <DownloadTab

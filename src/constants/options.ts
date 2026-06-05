@@ -3,11 +3,15 @@ export const UNIVERSES: Record<string, string> = {
   sp500: "S&P 500",
   russell3000: "Russell 3000",
   liquid500: "Liquid 500",
+  sp100: "S&P 100",
+  nasdaq100: "Nasdaq 100",
 };
 export const UNIVERSES_CODES: Record<string, string> = {
   "S&P 500": "sp500",
   "Russell 3000": "russell3000",
   "Liquid 500": "liquid500",
+  "S&P 100": "sp100",
+  "Nasdaq 100": "nasdaq100",
 };
 
 export const INDIVIDUAL_ETFS = [
@@ -76,6 +80,18 @@ export const STOPLOSS_TYPE: Record<string, string> = {
   nrml: "NORMAL",
   atr_based: "ATR_BASED",
   dollar_based: "DOLLAR_BASED",
+};
+
+// Volatility Safety Net Types
+// Picked from the per-regime "Safety Net" card. Drives the engine behaviour.
+//   none           — no safety net; strategy trades freely
+//   simple         — stateless freeze/resume rule trees (current behaviour)
+//   spy_volatility — stateful 4-escape state machine (Stage 3 — not yet wired)
+export const SAFETY_NET_TYPES: Record<string, string> = {
+  none: "None — no safety net",
+  simple: "Simple — freeze & resume rule trees",
+  spy_volatility: "SPY Volatility — stateful 4-escape model",
+  spy_volatility_pause: "SPY Volatility Pause — relative-threshold gate (block entries only)",
 };
 
 // Takeprofit Type
