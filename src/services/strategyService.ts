@@ -1,9 +1,9 @@
-// src/services/strategyService.ts
-import API from "../config/api.ts";
 import { Strategy } from "../model/Strategy.ts";
 import { PerformanceMetrics } from "../model/Performance.ts";
 import { MarketRegime } from "../model/MarketRegime.ts";
 import { StrategyResponse } from "../model/StrategyResponse.ts";
+import API from "../config/api.ts";
+
 
 export async function fetchStrategies(): Promise<Strategy[]> {
   const res = await API.get<Strategy[]>("/strategies");
@@ -32,9 +32,23 @@ export async function runInSample(strategy: Strategy): Promise<Strategy> {
   return data;
 }
 
-export async function equityGraph(strategyId: number) {
-  const { data } = await API.get(`/${strategyId}/equity`);
+export async function equityGraph(strategyId: number, benchmark?: string) {
+  const { data } = await API.get(`/${strategyId}/equity`, {
+    params: benchmark ? { benchmark } : undefined,
+  });
   return data;
+}
+
+// Patch 50: utility distribution (slots + capital deployed) as a Plotly figure
+export async function utilityDistribution(strategyId: number) {
+  const { data } = await API.get(`/${strategyId}/utility-distribution`);
+  return data;
+}
+
+// Patch 12: list index benchmarks available for the equity-compare overlay
+export async function getBenchmarks(): Promise<{ key: string; label: string }[]> {
+  const { data } = await API.get(`/benchmarks`);
+  return data as { key: string; label: string }[];
 }
 
 export async function saveMarketRegime(marketRegime: MarketRegime) {
@@ -107,3 +121,4 @@ export async function downloadInputFile(
   });
   return data;
 }
+

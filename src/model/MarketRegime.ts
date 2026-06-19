@@ -66,6 +66,9 @@ export interface MarketRegime {
   exit_timing?: string;
 
   stoploss_type?: string;
+  // Patch 72g: PORTFOLIO drawdown anchor. 'PEAK' or 'DAILY'.
+  // Required (defaulted to PEAK at save layer) when stoploss_type==='PORTFOLIO'.
+  portfolio_stoploss_anchor?: string | null;
 
   takeprofit_type?: string;
   stoploss_pct?: number;
@@ -91,6 +94,15 @@ export interface MarketRegime {
   universe?: string;
   capital?: number;
   slots?: number;
+    // Patch F0: trader-editable substitute pool size. How many extra ranked
+  // candidates beyond `slots` to cache as the substitute pool each night.
+  // 0 disables substitution. Read by Position Manager (Phase C/C2) to split
+  // proposedOrders into PROPOSED + SUBSTITUTE_POOL rows.
+  substitute_pool_size?: number;
+  // Patch 57: per-regime live execution sizing. Required when the parent
+  // strategy has execution_enabled=true. Backtest uses `capital` above;
+  // payload_builder swaps `capital` for this value at execution time.
+  production_capital?: number | null;
   rebalance?: string;
   created_at?: string;
   max_time?: number;
@@ -137,6 +149,18 @@ export interface MarketRegime {
   max_duplicate_sets?: number;
   tdom_filters?: TdomFilter[];
   vol_filter?: VolFilter | null;
+
+    // LRA Patch 37: LONGSHORT system_type fields. All optional — only used
+  // by LRA Pairs strategies. ROC strategies leave them undefined.
+  // The JSON shapes are validated by the engine at backtest time; we keep
+  // them as free-form dicts in the UI so iteration on the schema is cheap.
+  ticker_classification?: Record<string, any>;
+  pairing_entry_rules?: Record<string, any>;
+  pairing_exit_rules?: Record<string, any>;
+  sizing_policy?: Record<string, any>;
+  pair_exit_policy?: Record<string, any>;
+  entry_rules_tree_long?: Record<string, any>;
+  entry_rules_tree_short?: Record<string, any>;
 }
 
 export interface TdomFilter {

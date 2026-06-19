@@ -19,9 +19,14 @@ export interface Strategy {
   min_quantity: number;
   min_price: number;
 
-  // System details
+// System details
   system_type: string;
   market_regime_type: string;
+
+  // F5 — Live execution config. Persisted by save-strategy. Optional;
+  // strategies without these set are display-only / backtest-only.
+  production_capital?: number | null;
+  execution_enabled?: boolean;
 
   regimes: MarketRegime[];
 

@@ -4,6 +4,10 @@ import {
   INDEX_TICKERS,
   ORDER_TYPE,
   STOPLOSS_TYPE,
+  allowedStoplossTypesForRegime,  // Patch 67a
+  PORTFOLIO_STOPLOSS_ANCHOR,           // Patch 72i
+  PORTFOLIO_STOPLOSS_ANCHOR_LABELS,    // Patch 72i
+  PORTFOLIO_STOPLOSS_ANCHOR_DEFAULT,   // Patch 72i
   TAKEPROFIT_TYPE,
   RISK_TIMING,
   RANKING_ORDERS,
@@ -18,10 +22,19 @@ import RulesTreeEditor, { nodeToExpr, RulePillsDisplay } from "../pages/RuleTree
 import { getRegimeConfig } from "../config/regimeConfig.ts";
 import RuleEditorModal from "../pages/RuleEditorModal.tsx";
 import { useIndicatorRegistry } from "../context/IndicatorRegistry.tsx";
+// LRA Patch 38 — real form editors for LONGSHORT system_type
+import PairExitPolicyEditor from "../pages/PairExitPolicyEditor.tsx";
+import TickerClassificationEditor from "../pages/TickerClassificationEditor.tsx";
+import SizingPolicyEditor from "../pages/SizingPolicyEditor.tsx";
+import PairingRulesEditor from "../pages/PairingRulesEditor.tsx";
+import LegTreeEditor from "../pages/LegTreeEditor.tsx";
+// LRA Patch 40 — defaults + preflight helpers
+import { getLraDefaultsForRegime, computeLraPreflight } from "../utils/lraHelpers.ts";
 
 interface Props {
   regime: MarketRegime;
   onUpdate: (r: MarketRegime) => void;
+  systemType?: string;                  // LRA Patch 37 — gates the LONGSHORT config section
 }
 
 type ActiveEditor =
@@ -40,6 +53,14 @@ type ActiveEditor =
   | "banned_months"
   | "tdom"
   | "vol_filter"
+  // LRA Patch 38 — LONGSHORT-specific editors
+  | "lra_classification"
+  | "lra_pairing_entry"
+  | "lra_pairing_exit"
+  | "lra_sizing"
+  | "lra_pair_exit"
+  | "lra_tree_long"
+  | "lra_tree_short"
   | null;
 
 // MONTH_LABELS, TDOM_LABELS, WD_LABELS imported from constants/uiConstants.ts
@@ -92,7 +113,7 @@ const RiskOverviewCard: React.FC<{
   </div>
 );
 
-const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
+const RegimeCard: React.FC<Props> = ({ regime, onUpdate, systemType }) => {
   const { indicatorsFor, labelFor, registry } = useIndicatorRegistry();
 
   const makeEmptyTree = (): RuleTree => ({
@@ -257,8 +278,23 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
         return { title: "Edit Banned Months", maxWidth: "520px" };
       case "tdom":
         return { title: "Edit TDOM Filters", maxWidth: "720px" };
-      case "vol_filter":
+case "vol_filter":
         return { title: "Edit Vol / Turnover Filter", maxWidth: "720px" };
+      // LRA Patch 38
+      case "lra_classification":
+        return { title: "Edit Ticker Classification", maxWidth: "800px" };
+      case "lra_pairing_entry":
+        return { title: "Edit Pairing Entry Rules", maxWidth: "640px" };
+      case "lra_pairing_exit":
+        return { title: "Edit Pairing Exit Rules", maxWidth: "640px" };
+      case "lra_sizing":
+        return { title: "Edit Sizing Policy", maxWidth: "880px" };
+      case "lra_pair_exit":
+        return { title: "Edit Pair Exit Policy", maxWidth: "520px" };
+      case "lra_tree_long":
+        return { title: "Edit Entry Rules Tree (Long)", maxWidth: "1024px" };
+      case "lra_tree_short":
+        return { title: "Edit Entry Rules Tree (Short)", maxWidth: "1024px" };
       default:
         return { title: "", maxWidth: "1024px" };
     }
@@ -273,6 +309,9 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
   })();
 
   // ── Risk subsection summaries ──
+// Patch 71: PORTFOLIO summary reads "PORTFOLIO · 15% · EOD · kill-switch"
+  // so the regime card surfaces the kill-switch behaviour without opening
+  // the modal. Other types unchanged.
   const stoplossSummary = (() => {
     if (!regime.stoploss_type) return { text: "Not configured", isEmpty: true };
     const parts: string[] = [regime.stoploss_type];
@@ -284,7 +323,13 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
     if (regime.stoploss_type === "ATR_BASED" && regime.atr_lookback_stp) {
       parts.push(`ATR(${regime.atr_lookback_stp})`);
     }
-    if (regime.stoploss_timing) parts.push(regime.stoploss_timing);
+    if (regime.stoploss_type === "PORTFOLIO") {
+          // Patch 72j: include anchor in PORTFOLIO summary.
+          const anchor = regime.portfolio_stoploss_anchor || "PEAK";
+          parts.push(anchor === "DAILY" ? "daily" : "peak", "EOD", "kill-switch");
+        } else if (regime.stoploss_timing) {
+          parts.push(regime.stoploss_timing);
+        }
     return { text: parts.join(" · "), isEmpty: false };
   })();
 
@@ -390,8 +435,62 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
     };
   })();
 
-  return (
+return (
     <>
+      {/* LRA Patch 40 — top amber band removed; LRA tiles moved into the Rules column below Safety Nets */}
+      {false && systemType === "LONGSHORT" && (
+        <div className="bg-amber-50 rounded-2xl border border-amber-200 p-5 mb-4 space-y-3">
+          <h4 className="text-lg font-bold text-amber-800 mb-2">
+            🔗 LRA Pairs Config
+          </h4>
+          {(() => {     
+                // LRA Patch 40.1 — cast to any. These fields are loose JSON shapes
+                // and TS narrowing inside the sum() closure below fails on the
+                // ternary truthy checks otherwise (closures break narrowing even
+                // with const captures).
+                const tc  = regime.ticker_classification as any;
+                const per = regime.pairing_entry_rules as any;
+                const pex = regime.pairing_exit_rules as any;
+                const sp  = regime.sizing_policy as any;
+                const pep = regime.pair_exit_policy as any;
+                const trL = regime.entry_rules_tree_long as any;
+                const trS = regime.entry_rules_tree_short as any;
+
+            const sum = {
+              tc:  tc  ? `${Object.keys(tc).length} tickers configured`            : "Not configured",
+              per: per ? `${(per.disallowed_combos || []).length} disallowed combos · swap ${per.backtracking?.swap_target ?? "—"}` : "Not configured",
+              pex: pex ? `${(pex.disallowed_combos || []).length} disallowed combos` : "Not configured",
+              sp:  sp  ? `${sp.mode ?? "no mode"} · ${(sp.params?.bands || []).length} bands · ${(sp.params?.overrides || []).length} overrides` : "Not configured",
+              pep: pep ? `Max ${pep.max_hold_sessions ?? "?"} sessions · profit ${pep.profit_exit?.enabled ? "ON" : "OFF"}` : "Not configured",
+              trL: trL ? `${(trL.children || []).length} top-level nodes`           : "Not configured",
+              trS: trS ? `${(trS.children || []).length} top-level nodes`           : "Not configured",
+            };
+            const tiles: Array<[string, string, () => void]> = [
+              ["Ticker Classification",     sum.tc,  () => setActiveEditor("lra_classification")],
+              ["Pairing Entry Rules",       sum.per, () => setActiveEditor("lra_pairing_entry")],
+              ["Pairing Exit Rules",        sum.pex, () => setActiveEditor("lra_pairing_exit")],
+              ["Sizing Policy",             sum.sp,  () => setActiveEditor("lra_sizing")],
+              ["Pair Exit Policy",          sum.pep, () => setActiveEditor("lra_pair_exit")],
+              ["Entry Rules Tree (Long)",   sum.trL, () => setActiveEditor("lra_tree_long")],
+              ["Entry Rules Tree (Short)",  sum.trS, () => setActiveEditor("lra_tree_short")],
+            ];
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {tiles.map(([label, summary, onEdit]) => (
+                  <RiskOverviewCard
+                    key={label}
+                    label={label}
+                    summary={summary}
+                    isEmpty={summary === "Not configured"}
+                    onEdit={onEdit}
+                  />
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
       <div className="bg-white shadow-lg rounded-2xl border border-gray-300 p-6 space-y-6 hover:shadow-xl transition">
         {/* Header */}
         <div className="flex justify-between items-center border-b pb-3">
@@ -405,7 +504,11 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
           <h4 className="text-lg font-bold text-blue-800 mb-3">
             📊 Portfolio Basics
           </h4>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Patch F0: widened from sm:grid-cols-3 to sm:grid-cols-4 to fit
+              the new Substitute Pool Size input next to Slots.
+              Patch 59: widened again to sm:grid-cols-5 to fit Production Capital
+              after Substitute Pool Size. */}
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
             {/* Universe */}
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">
@@ -505,7 +608,7 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
               />
             </div>
 
-            {/* Slots */}
+          {/* Slots */}
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">
                 Slots<span className="text-red-600">*</span>
@@ -520,8 +623,53 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
                 className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-blue-200"
               />
             </div>
+
+{/* Patch F0: Substitute Pool Size — trader-editable.
+                Read by Position Manager (Phase C/C2) to split the engine's
+                ranked candidate list into top-N PROPOSED + next-M SUBSTITUTE_POOL.
+                0 disables substitution entirely. */}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Substitute Pool Size
+              </label>
+              <input
+                type="number"
+                value={regime.substitute_pool_size ?? ""}
+                onChange={(e) =>
+                  onUpdate({
+                    ...regime,
+                    substitute_pool_size: e.target.value === "" ? 0 : +e.target.value,
+                  })
+                }
+                placeholder="0 disables"
+                className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-blue-200"
+              />
+            </div>
+
+            {/* Patch 59: Production Capital — per-regime live execution sizing.
+                Backtest uses `Capital` above; live nightly PM uses this value.
+                Required when the parent strategy has execution_enabled=true. */}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Production Capital
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={regime.production_capital ?? ""}
+                onChange={(e) =>
+                  onUpdate({
+                    ...regime,
+                    production_capital:
+                      e.target.value === "" ? null : +e.target.value,
+                  })
+                }
+                placeholder="live sizing"
+                className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-blue-200"
+              />
+            </div>
           </div>
-        </div>
+        </div>    
 
         {/* SPLIT: Risk & Portfolio Parameters (LEFT) | Rules + Timing (RIGHT) */}
        <div className="grid grid-cols-1 lg:grid-cols-[3fr_7fr] gap-6">
@@ -580,26 +728,32 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
               </label>
             )}
 
-            <div className="space-y-2">
-              <RiskOverviewCard
-                label="Stoploss"
-                summary={stoplossSummary.text}
-                isEmpty={stoplossSummary.isEmpty}
-                onEdit={() => setActiveEditor("stoploss")}
-              />
-              <RiskOverviewCard
-                label="Takeprofit"
-                summary={takeprofitSummary.text}
-                isEmpty={takeprofitSummary.isEmpty}
-                onEdit={() => setActiveEditor("takeprofit")}
-              />
+        <div className="space-y-2">
+              {/* LRA Patch 40 — Stoploss/Takeprofit replaced by Pair Exit Policy for LONGSHORT */}
+              {systemType !== "LONGSHORT" && (
+                <>
+                  <RiskOverviewCard
+                    label="Stoploss"
+                    summary={stoplossSummary.text}
+                    isEmpty={stoplossSummary.isEmpty}
+                    onEdit={() => setActiveEditor("stoploss")}
+                  />
+                  <RiskOverviewCard
+                    label="Takeprofit"
+                    summary={takeprofitSummary.text}
+                    isEmpty={takeprofitSummary.isEmpty}
+                    onEdit={() => setActiveEditor("takeprofit")}
+                  />
+                </>
+              )}
               <RiskOverviewCard
                 label="Order Settings"
                 summary={orderSummary.text}
                 isEmpty={orderSummary.isEmpty}
                 onEdit={() => setActiveEditor("order")}
               />
-              {config.features.ranking && (
+            {/* LRA Patch 40 — Ranking replaced by top_n_universe inside leg trees for LONGSHORT */}
+              {config.features.ranking && systemType !== "LONGSHORT" && (
                 <RiskOverviewCard
                   label="Ranking"
                   summary={rankingSummary.text}
@@ -708,7 +862,7 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
                     ✏ Edit
                   </button>
                 </div>
-                {safetyNets.length === 0 ? (
+              {safetyNets.length === 0 ? (
                   <p className="text-xs text-gray-700 italic">
                     No safety nets. The strategy trades freely regardless of market conditions.
                   </p>
@@ -730,8 +884,124 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
                 )}
               </div>
 
-              {/* Entry Rules overview */}
-              {(() => {
+              {/* LRA Patch 40 — Load Defaults button + 7 LRA tiles + Preflight panel, all inside the Rules column */}
+              {systemType === "LONGSHORT" && (() => {
+                const tc  = regime.ticker_classification;
+                const per = regime.pairing_entry_rules;
+                const pex = regime.pairing_exit_rules;
+                const sp  = regime.sizing_policy;
+                const pep = regime.pair_exit_policy;
+                const trL = regime.entry_rules_tree_long;
+                const trS = regime.entry_rules_tree_short;
+                const sum = (key: string) => {
+                  switch (key) {
+                    case "classification":  return tc  ? `${Object.keys(tc).length} tickers · risk & range tier set` : "Risk & range tier for each ticker";
+                    case "tree_long":       return trL ? `Long tree configured (${(trL.children || []).length} children)` : "When to buy the long leg";
+                    case "tree_short":      return trS ? `Short tree configured (${(trS.children || []).length} children)` : "When to sell the short leg";
+                    case "pairing_entry":   return per ? `${(per.disallowed_combos || []).length} disallowed combos · swap ${per.backtracking?.swap_target ?? "—"}` : "Which long–short combos can form";
+                    case "sizing":          return sp  ? `${sp.mode ?? "no mode"} · ${(sp.params?.bands || []).length} bands` : "Dollar allocation per leg";
+                    case "pair_exit":       return pep ? `Max ${pep.max_hold_sessions ?? "?"} sessions · profit ${pep.profit_exit?.enabled ? "ON" : "OFF"}` : "When to close pairs";
+                    case "pairing_exit":    return pex ? `${(pex.disallowed_combos || []).length} disallowed combos` : "Advanced pair-exit constraints";
+                  }
+                  return "";
+                };
+                const isEmpty = (key: string) => {
+                  switch (key) {
+                    case "classification":  return !tc;
+                    case "tree_long":       return !trL;
+                    case "tree_short":      return !trS;
+                    case "pairing_entry":   return !per;
+                    case "sizing":          return !sp;
+                    case "pair_exit":       return !pep;
+                    case "pairing_exit":    return !pex;
+                  }
+                  return true;
+                };
+                const tiles: Array<[string, string, string, string]> = [
+                  ["classification",  "Ticker Classification",    "📋", "Setup"],
+                  ["tree_long",       "Entry Rules Tree (Long)",  "📈", "Entry"],
+                  ["tree_short",      "Entry Rules Tree (Short)", "📉", "Entry"],
+                  ["pairing_entry",   "Pairing Entry Rules",      "🔀", "Entry"],
+                  ["sizing",          "Sizing Policy",            "💰", "Sizing"],
+                  ["pair_exit",       "Pair Exit Policy",         "🚪", "Exit"],
+                  ["pairing_exit",    "Pairing Exit Rules",       "🔀", "Exit"],
+                ];
+                const handleLoadDefaults = () => {
+                  const hasAny = !!(tc || per || pex || sp || pep || trL || trS);
+                  if (hasAny && !window.confirm("This will overwrite your current LRA configuration. Continue?")) {
+                    return;
+                  }
+                  const defaults = getLraDefaultsForRegime(regime);
+                  onUpdate({ ...regime, ...defaults });
+                };
+                const availableIndicators = Object.keys(registry || {});
+                const preflight = computeLraPreflight(regime, availableIndicators);
+                const okCount   = preflight.filter((p) => p.state === "ok").length;
+                const warnCount = preflight.filter((p) => p.state === "warn").length;
+                const errCount  = preflight.filter((p) => p.state === "err").length;
+                return (
+                  <>
+                    <div className="flex justify-end pt-1">
+                      <button
+                        type="button"
+                        onClick={handleLoadDefaults}
+                        className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition whitespace-nowrap font-medium"
+                      >
+                        ✨ Load LRA defaults
+                      </button>
+                    </div>
+
+                    {tiles.map(([key, label, icon, , ]) => (
+                      <div key={key} className="bg-gray-50 rounded-lg p-3 border flex items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-bold text-gray-800">
+                            <span className="mr-1.5" aria-hidden="true">{icon}</span>{label}
+                            {key === "pairing_exit" && (
+                              <span className="ml-2 text-[10px] font-normal text-gray-500">(optional)</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-500 truncate">{sum(key)}</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setActiveEditor(`lra_${key === "classification" ? "classification" : key === "tree_long" ? "tree_long" : key === "tree_short" ? "tree_short" : key === "pairing_entry" ? "pairing_entry" : key === "sizing" ? "sizing" : key === "pair_exit" ? "pair_exit" : "pairing_exit"}` as any)}
+                          className="text-xs px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition whitespace-nowrap shrink-0 font-medium"
+                        >
+                          {isEmpty(key) ? "+ Add" : "✏ Edit"}
+                        </button>
+                      </div>
+                    ))}
+
+                    <div className="bg-white rounded-lg p-3 border mt-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-sm font-bold text-gray-800">✅ Pre-flight checks</div>
+                        <div className="text-xs">
+                          {okCount > 0   && <span className="text-green-700 font-semibold">{okCount} passing</span>}
+                          {warnCount > 0 && <span className="text-yellow-700 font-semibold ml-2">{warnCount} warning{warnCount === 1 ? "" : "s"}</span>}
+                          {errCount > 0  && <span className="text-red-700 font-semibold ml-2">{errCount} blocker{errCount === 1 ? "" : "s"}</span>}
+                        </div>
+                      </div>
+                      <ul className="space-y-1">
+                        {preflight.map((c, i) => (
+                          <li key={i} className="flex items-start gap-2 text-xs">
+                            <span className={
+                              c.state === "ok"   ? "text-green-600 font-bold" :
+                              c.state === "warn" ? "text-yellow-600 font-bold" :
+                                                   "text-red-600 font-bold"
+                            }>
+                              {c.state === "ok" ? "✓" : c.state === "warn" ? "⚠" : "✗"}
+                            </span>
+                            <span className="text-gray-700">{c.text}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </>
+                );
+              })()}
+
+              {/* Entry Rules overview — LRA Patch 40: hidden for LONGSHORT */}
+              {systemType !== "LONGSHORT" && (() => {
                 const s = summarizeTree(entryTree);
                 const isEmpty = s.count === 0;
                 return (
@@ -762,8 +1032,8 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
                 );
               })()}
 
-              {/* Exit Rules overview */}
-              {(() => {
+              {/* Exit Rules overview — LRA Patch 40: hidden for LONGSHORT */}
+              {systemType !== "LONGSHORT" && (() => {
                 const s = summarizeTree(exitTree);
                 const isEmpty = s.count === 0;
                 return (
@@ -1254,26 +1524,59 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
               <label className="block text-sm font-bold text-gray-700 mb-2">
                 Stoploss Type
               </label>
+              {/* Patch 67b: dropdown filtered by allowedStoplossTypesForRegime —
+                  ETF regimes show only DOLLAR_BASED; non-ETF show NORMAL/ATR/PORTFOLIO.
+                  Adding a new type only requires updating STOPLOSS_TYPE_REGIME_GATING
+                  in options.ts (and the Python + Java mirrors). */}
               <select
                 value={regime.stoploss_type || ""}
-                onChange={(e) =>
-                  onUpdate({ ...regime, stoploss_type: e.target.value })
-                }
+                onChange={(e) => {
+                  const newType = e.target.value;
+                  // Patch 67b: PORTFOLIO is EOD-only — force timing on switch.
+                  // Patch 72i: also default anchor to PEAK on first selection so
+                  // the dropdown shows a value immediately; clear anchor on switch
+                  // to a non-PORTFOLIO type so it doesn't linger.
+                  const patch: Partial<MarketRegime> = { stoploss_type: newType };
+                  if (newType === "PORTFOLIO") {
+                    patch.stoploss_timing = "EOD";
+                    if (!regime.portfolio_stoploss_anchor) {
+                      patch.portfolio_stoploss_anchor = PORTFOLIO_STOPLOSS_ANCHOR_DEFAULT;
+                    }
+                  } else {
+                    patch.portfolio_stoploss_anchor = null;
+                  }
+                  onUpdate({ ...regime, ...patch } as MarketRegime);
+                }}
                 className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-indigo-200"
               >
                 <option value="">-- Select --</option>
-                {Object.entries(STOPLOSS_TYPE).map(([key, label]) => (
-                  <option key={key} value={label}>
-                    {label}
+                {allowedStoplossTypesForRegime(regime.regime_type).map((t) => (
+                  <option key={t} value={t}>
+                    {t}
                   </option>
                 ))}
               </select>
+              {isIndividualEtfSimple ? (
+                <p className="text-xs text-gray-500 mt-1">
+                  ETF regimes use absolute-dollar stops only.
+                </p>
+              ) : (
+                <p className="text-xs text-gray-500 mt-1">
+                  Equity regimes use percent or ATR per-position stops, or a portfolio-level stop.
+                </p>
+              )}
             </div>
 
-            {regime.stoploss_type !== "DOLLAR_BASED" && (
+            {/* Patch 67b: pct field shown for NORMAL, ATR_BASED, and PORTFOLIO.
+                For PORTFOLIO the label changes to "Drawdown trigger %". */}
+            {(regime.stoploss_type === "NORMAL" ||
+              regime.stoploss_type === "ATR_BASED" ||
+              regime.stoploss_type === "PORTFOLIO") && (
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Stoploss %
+                  {regime.stoploss_type === "PORTFOLIO"
+                    ? "Drawdown trigger %"
+                    : "Stoploss %"}
                 </label>
                 <input
                   type="number"
@@ -1282,8 +1585,38 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
                     onUpdate({ ...regime, stoploss_pct: +e.target.value })
                   }
                   className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-red-200"
-                  placeholder="e.g. 5"
+placeholder={
+                    regime.stoploss_type === "PORTFOLIO" ? "e.g. 15" : "e.g. 5"
+                  }
                 />
+              </div>
+            )}
+
+            {/* Patch 72i: PORTFOLIO anchor dropdown. Determines what the drop
+                is measured against — all-time peak equity or yesterday's close. */}
+            {regime.stoploss_type === "PORTFOLIO" && (
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Drawdown anchor
+                </label>
+                <select
+                  value={regime.portfolio_stoploss_anchor || PORTFOLIO_STOPLOSS_ANCHOR_DEFAULT}
+                  onChange={(e) =>
+                    onUpdate({ ...regime, portfolio_stoploss_anchor: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-indigo-200"
+                >
+                  {Object.values(PORTFOLIO_STOPLOSS_ANCHOR).map((value) => (
+                    <option key={value} value={value}>
+                      {PORTFOLIO_STOPLOSS_ANCHOR_LABELS[value] || value}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  {(regime.portfolio_stoploss_anchor || PORTFOLIO_STOPLOSS_ANCHOR_DEFAULT) === "PEAK"
+                    ? "Reference rises with new equity highs. Trips on cumulative drawdown."
+                    : "Reference is yesterday's close. Trips only on a single-day drop."}
+                </p>
               </div>
             )}
 
@@ -1323,30 +1656,51 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
               </div>
             )}
 
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
-                Stoploss Timing
-              </label>
-              <select
-                value={regime.stoploss_timing || ""}
-                onChange={(e) =>
-                  onUpdate({ ...regime, stoploss_timing: e.target.value })
-                }
-                className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-indigo-200"
-              >
-                <option value="">-- Select --</option>
-                {Object.entries(RISK_TIMING)
-                  .filter(
-                    ([key]) =>
-                      config.features.intradayTiming || key !== "intraday"
-                  )
-                  .map(([key, label]) => (
-                    <option key={key} value={label}>
-                      {label}
-                    </option>
-                  ))}
-              </select>
-            </div>
+            {/* Patch 67b: PORTFOLIO replaces the timing dropdown with a locked
+                EOD badge. The save route (Patch 66) also force-sets stoploss_timing
+                = "EOD" defensively. */}
+            {regime.stoploss_type === "PORTFOLIO" ? (
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Stoploss Timing
+                </label>
+                <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg text-sm text-gray-700">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  <span>EOD only — evaluated on today&apos;s close, action on next-day open</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  When drop ≥ trigger %, all open positions close at OPG MKT on the next trading day.
+                  Strategy then halts (execution_enabled → False) until manually re-enabled.
+                </p>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Stoploss Timing
+                </label>
+                <select
+                  value={regime.stoploss_timing || ""}
+                  onChange={(e) =>
+                    onUpdate({ ...regime, stoploss_timing: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-indigo-200"
+                >
+                  <option value="">-- Select --</option>
+                  {Object.entries(RISK_TIMING)
+                    .filter(
+                      ([key]) =>
+                        config.features.intradayTiming || key !== "intraday"
+                    )
+                    .map(([key, label]) => (
+                      <option key={key} value={label}>
+                        {label}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
           </div>
         )}
 
@@ -2084,13 +2438,69 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate }) => {
                   </div>
                 </div>
 
-                <p className="text-xs text-gray-500 pt-1 border-t mt-2">
+<p className="text-xs text-gray-500 pt-1 border-t mt-2">
                   CRDT_1 defaults: Vol bull=0.20, bear=0.45 · Turnover bull=0.35,
                   bear=0.05
                 </p>
               </div>
             )}
           </div>
+        )}
+
+        {/* LRA Patch 38 — LONGSHORT editor content blocks */}
+        {activeEditor === "lra_classification" && (
+          <TickerClassificationEditor
+            value={regime.ticker_classification}
+            onChange={(v) => onUpdate({ ...regime, ticker_classification: v })}
+          />
+        )}
+        {activeEditor === "lra_pairing_entry" && (
+          <PairingRulesEditor
+            value={regime.pairing_entry_rules}
+            onChange={(v) => onUpdate({ ...regime, pairing_entry_rules: v })}
+          />
+        )}
+        {activeEditor === "lra_pairing_exit" && (
+          <PairingRulesEditor
+            value={regime.pairing_exit_rules}
+            onChange={(v) => onUpdate({ ...regime, pairing_exit_rules: v })}
+          />
+        )}
+        {activeEditor === "lra_sizing" && (
+          <SizingPolicyEditor
+            value={regime.sizing_policy}
+            onChange={(v) => onUpdate({ ...regime, sizing_policy: v })}
+          />
+        )}
+        {activeEditor === "lra_pair_exit" && (
+          <PairExitPolicyEditor
+            value={regime.pair_exit_policy}
+            onChange={(v) => onUpdate({ ...regime, pair_exit_policy: v })}
+          />
+        )}
+        {activeEditor === "lra_tree_long" && (
+          <LegTreeEditor
+            value={regime.entry_rules_tree_long}
+            onChange={(v) => onUpdate({ ...regime, entry_rules_tree_long: v })}
+            indicators={Object.keys(registry || {})}
+            classificationFields={
+              regime.ticker_classification
+                ? Array.from(new Set(Object.values(regime.ticker_classification).flatMap((row: any) => Object.keys(row || {}))))
+                : []
+            }
+          />
+        )}
+        {activeEditor === "lra_tree_short" && (
+          <LegTreeEditor
+            value={regime.entry_rules_tree_short}
+            onChange={(v) => onUpdate({ ...regime, entry_rules_tree_short: v })}
+            indicators={Object.keys(registry || {})}
+            classificationFields={
+              regime.ticker_classification
+                ? Array.from(new Set(Object.values(regime.ticker_classification).flatMap((row: any) => Object.keys(row || {}))))
+                : []
+            }
+          />
         )}
       </RuleEditorModal>
     </>

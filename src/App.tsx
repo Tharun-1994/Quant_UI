@@ -6,6 +6,10 @@ import StrategyTable from "./pages/StrategyTable.tsx";
 import StrategyDetail from "./pages/StrategyDetail.tsx";
 import AdminIndicators from "./pages/AdminIndicators.tsx";
 import IndicatorsPage from "./pages/IndicatorsPage.tsx";
+import HoldingsAndTradesPage from "./pages/HoldingsAndTradesPage.tsx";
+import BasketReviewPage from "./pages/BasketReviewPage.tsx";
+import EodRunHistoryPage from "./pages/EodRunHistoryPage.tsx";
+import SystemComparePage from "./pages/SystemComparePage.tsx";
 import { IndicatorRegistryProvider } from "./context/IndicatorRegistry.tsx";
 
 const App: React.FC = () => {
@@ -32,6 +36,10 @@ const App: React.FC = () => {
           <Route path="/strategies/:id/edit" element={<StrategyDetail mode="edit" />} />
           <Route path="/admin/indicators" element={<AdminIndicators />} />
           <Route path="/indicators" element={<IndicatorsPage />} />
+          <Route path="/compare" element={<SystemComparePage />} />
+          <Route path="/execution/holdings" element={<HoldingsAndTradesPage />} />
+          <Route path="/execution/basket" element={<BasketReviewPage />} />
+          <Route path="/execution/run-log" element={<EodRunHistoryPage />} />
         </Routes>
       </Router>
     </IndicatorRegistryProvider>

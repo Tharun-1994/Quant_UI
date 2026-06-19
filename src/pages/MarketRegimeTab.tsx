@@ -33,6 +33,7 @@ const MarketRegimeTab: React.FC<MarketRegimeTabProps> = ({
       universe: "",
       capital: 0,
       slots: 0,
+      substitute_pool_size: 0,   // Patch F0: 0 = no substitute pool
       entry_timing: "",
       exit_timing: "",
       order_type: "",
@@ -84,6 +85,7 @@ useEffect(() => {
         universe: "",
         capital: 0,
         slots: 0,
+        substitute_pool_size: 0,   // Patch F0: 0 = no substitute pool
         entry_timing: "",
         exit_timing: "",
         order_type: "",
@@ -105,7 +107,9 @@ useEffect(() => {
     if (!r.order_type) missing.push("Order type");
 
     // Ranking — required for equity (not ETF)
-    if (r.regime_type !== 'Individual ETFs - Simple') {
+    // LRA Patch 41: skip for LONGSHORT system_type (top_n_universe lives inside the leg trees,
+    // there's no regime-level ranking config to fill in).
+    if (r.regime_type !== 'Individual ETFs - Simple' && strategy.system_type !== 'LONGSHORT') {
       if (!r.ranking) missing.push("Ranking indicator");
       if (!r.ranking_lookback) missing.push("Ranking lookback");
       if (!r.ranking_order) missing.push("Ranking order");
@@ -272,16 +276,17 @@ const handleRunBacktest = async () => {
       {/* Regime Cards */}
       <div className="space-y-6">
         {regimes.map((r, i) => (
-          <RegimeCard
-            key={i}
-            regime={r}
-            onUpdate={(updated) => {
-              const copy = [...regimes];
-              copy[i] = updated;
-              setRegimes(copy);
-            }}
-          />
-        ))}
+                  <RegimeCard
+                    key={i}
+                    regime={r}
+                    systemType={strategy.system_type}
+                    onUpdate={(updated) => {
+                      const copy = [...regimes];
+                      copy[i] = updated;
+                      setRegimes(copy);
+                    }}
+                  />
+                ))}
       </div>
 
       {/* Add Regime Button */}
