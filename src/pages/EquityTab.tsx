@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from "react";
 import Plot from "react-plotly.js";
-import { equityGraph, getBenchmarks } from "../services/strategyService.ts";
+import {
+  equityGraph,
+  getBenchmarks,
+  fetchLiveEquity,
+  LiveEquityPoint,
+} from "../services/strategyService.ts";
 
 interface Props {
   strategyId: number;
@@ -21,6 +26,14 @@ const EquityTab: React.FC<Props> = ({ strategyId }) => {
   const [selected, setSelected] = useState<string>("");
   const [activeBenchmark, setActiveBenchmark] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [liveEquity, setLiveEquity] = useState<LiveEquityPoint[]>([]);
+
+  // Load live equity snapshots alongside the backtest chart
+  useEffect(() => {
+    fetchLiveEquity(strategyId)
+      .then(setLiveEquity)
+      .catch(() => setLiveEquity([]));
+  }, [strategyId]);
 
   // Load the list of available index benchmarks once (auto-discovered on the backend).
   useEffect(() => {
@@ -38,7 +51,19 @@ const EquityTab: React.FC<Props> = ({ strategyId }) => {
     setLoading(true);
     equityGraph(strategyId, activeBenchmark ?? undefined)
       .then((res) => {
-        setData(res.data);
+        // Stitch live equity as a second trace on top of backtest equity
+        const traces = [...(res.data ?? [])];
+        if (liveEquity.length > 0) {
+          traces.push({
+            type: 'scatter',
+            mode: 'lines',
+            name: 'Live equity',
+            x: liveEquity.map((p) => p.date),
+            y: liveEquity.map((p) => p.equity),
+            line: { color: '#16a34a', width: 2, dash: 'solid' },
+          });
+        }
+        setData(traces);
         setLayout(res.layout);
         setError(null);
       })

@@ -45,9 +45,9 @@ const BasketReviewPage: React.FC = () => {
     <div className="p-6 max-w-7xl mx-auto">
       <Link
         to="/main"
-        className="inline-flex items-center text-sm text-gray-600 hover:text-indigo-600 mb-3"
+        className="inline-flex items-center gap-1.5 text-xs font-semibold tracking-wide text-gray-400 uppercase hover:text-indigo-600 transition-colors mb-4"
       >
-        ← Back to Main
+        ← Main menu
       </Link>
       <h1 className="text-2xl font-bold text-indigo-700 mb-4">Basket Review</h1>
 

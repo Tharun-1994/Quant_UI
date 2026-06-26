@@ -35,6 +35,7 @@ const [form, setForm] = useState<Strategy>({
     // F5: live-execution config (persisted by save-strategy)
     production_capital: null,
     execution_enabled: false,
+    system_code: "",
     regimes: [],
     ...initialValues,
   });
@@ -278,6 +279,28 @@ const [form, setForm] = useState<Strategy>({
           </p>
         </div>
       </div>
+      <div className="mt-4">
+          <label className="block mb-1 font-medium">
+            System code
+            <span className="ml-1 text-xs text-gray-400 font-normal">
+              (used for substitution CSV routing, e.g. M_SDEQ_52)
+            </span>
+          </label>
+          <input
+            type="text"
+            value={form.system_code ?? ""}
+            onChange={(e) =>
+              handleChange("system_code", e.target.value.toUpperCase())
+            }
+            placeholder="e.g. M_SDEQ_52"
+            className="w-full border rounded px-3 py-2 text-sm font-mono uppercase
+                       focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Must match the System column in the trader's substitution CSV exactly.
+            Leave blank if this strategy does not use substitution.
+          </p>
+        </div>
 
       <div>
         <label className="block mb-1 font-medium">Select Regime Type</label>

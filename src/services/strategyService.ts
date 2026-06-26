@@ -45,7 +45,22 @@ export async function utilityDistribution(strategyId: number) {
   return data;
 }
 
-// Patch 12: list index benchmarks available for the equity-compare overlay
+export interface LiveEquityPoint {
+  date: string;
+  equity: number | null;
+  unrealised_pnl: number | null;
+  unrealised_pct: number | null;
+  drawdown: number | null;
+  drawdown_pct: number | null;
+  open_position_count: number;
+  production_capital: number | null;
+}
+
+export async function fetchLiveEquity(strategyId: number): Promise<LiveEquityPoint[]> {
+  const { data } = await API.get<LiveEquityPoint[]>(`/${strategyId}/live-equity`);
+  return data;
+}
+
 export async function getBenchmarks(): Promise<{ key: string; label: string }[]> {
   const { data } = await API.get(`/benchmarks`);
   return data as { key: string; label: string }[];

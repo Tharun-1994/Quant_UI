@@ -129,6 +129,24 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate, systemType }) => {
   const [exitTree, setExitTree] = useState<RuleTree>(
     () => regime.exit_rules_tree ?? makeEmptyTree()
   );
+  // Patch 74: single source of truth for safety-net default params. The editor inputs render
+  // `p.x ?? <default>` — DISPLAY-ONLY. Without seeding, params serialises as {} unless the user
+  // manually edits every field, so the request shipped params:{} and the engine fell back to its
+  // own hardcoded defaults. Seeding here makes stored == shown.
+  const defaultParamsFor = (t: string): Record<string, any> => {
+    switch (t) {
+      case "spy_volatility_pause":
+        return { vol_ticker: "SPY", vol_lookback: 20, vol_median_lookback: 252, vol_multiple: 2.0 };
+      case "spy_volatility":
+        return { vol_ticker: "SPY", vol_lookback: 5, vol_threshold: 0.025, timeout_days: 20,
+                 selloff_pct: 0.20, peak_drop_pct: 0.80, rearm_pct: 0.80, close_on_rearm: false };
+      case "simple":
+        return { freeze_rules_tree: makeEmptyTree(), resume_rules_tree: makeEmptyTree(),
+                 freeze_timing: "open", resume_timing: "open" };
+      default:
+        return {};
+    }
+  };
 
   const [safetyNets, setSafetyNets] = useState<SafetyNetItem[]>(() => {
     const r: any = regime;
@@ -1186,12 +1204,7 @@ return (
                       onChange={(e) => {
                         const newType = e.target.value;
                         // When changing type, swap default params for the new type
-                        const newParams = newType === "simple"
-                          ? { freeze_rules_tree: makeEmptyTree(),
-                              resume_rules_tree: makeEmptyTree(),
-                              freeze_timing: "open",
-                              resume_timing: "open" }
-                          : {};
+                        const newParams = defaultParamsFor(newType);
                         setSafetyNets((prev) =>
                           prev.map((sn, i) =>
                             i === idx ? { type: newType, params: newParams } : sn

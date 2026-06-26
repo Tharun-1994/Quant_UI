@@ -7,6 +7,7 @@ import {
   runIndicatorSync,
 } from "../services/indicatorService.ts";
 import { CATEGORY_COLOURS } from "../constants/uiConstants.ts";
+import { Link } from "react-router-dom";
 
 // ── Content fields shown in the edit form ────────────────────────────────────
 const CONTENT_FIELDS: {
@@ -158,10 +159,13 @@ const AdminIndicators: React.FC = () => {
     <div className="max-w-7xl mx-auto p-6">
 
       {/* ── Header ── */}
-      <div className="mb-6 flex items-start justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">
-            Indicator descriptions
+        <div className="mb-6 flex items-start justify-between flex-wrap gap-4">
+          <div>
+            <Link to="/main" className="inline-flex items-center gap-1.5 text-xs font-semibold tracking-wide text-gray-400 uppercase hover:text-indigo-600 transition-colors mb-3">
+              ← Main menu
+            </Link>
+            <h1 className="text-2xl font-bold text-gray-800">
+              Indicator descriptions
           </h1>
           <p className="text-sm text-gray-500 mt-1">
             Manage the descriptions shown on the public Indicators page.

@@ -7,10 +7,14 @@ import StrategyDetail from "./pages/StrategyDetail.tsx";
 import AdminIndicators from "./pages/AdminIndicators.tsx";
 import IndicatorsPage from "./pages/IndicatorsPage.tsx";
 import HoldingsAndTradesPage from "./pages/HoldingsAndTradesPage.tsx";
+import SubstitutionPage from "./pages/SubstitutionPage.tsx";
 import BasketReviewPage from "./pages/BasketReviewPage.tsx";
 import EodRunHistoryPage from "./pages/EodRunHistoryPage.tsx";
 import SystemComparePage from "./pages/SystemComparePage.tsx";
+import UniverseExclusionsPage from "./pages/UniverseExclusionsPage.tsx";
+
 import { IndicatorRegistryProvider } from "./context/IndicatorRegistry.tsx";
+import LivePerformancePage from "./pages/Liveperformancepage.tsx";
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -40,6 +44,9 @@ const App: React.FC = () => {
           <Route path="/execution/holdings" element={<HoldingsAndTradesPage />} />
           <Route path="/execution/basket" element={<BasketReviewPage />} />
           <Route path="/execution/run-log" element={<EodRunHistoryPage />} />
+          <Route path="/execution/substitution" element={<SubstitutionPage />} />
+          <Route path="/universe/exclusions" element={<UniverseExclusionsPage />} />
+          <Route path="/execution/live-performance" element={<LivePerformancePage />} />
         </Routes>
       </Router>
     </IndicatorRegistryProvider>

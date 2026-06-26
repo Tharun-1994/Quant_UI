@@ -10,17 +10,24 @@
 // 18-column M_Combined_YYYYMMDD.csv basket file.
 //
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { href, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
-    ExecutionEnabledStrategy,
-    TradelistRow,
     fetchExecutionEnabledStrategies,
+    TradelistRow,
     fetchTradelistForStrategy,
     fetchBasketForDate,
     fetchLatestBasketDate,
+    fetchAllLiveHoldings,
     combinedBasketCsvUrl,
+    combinedBasketXlsxUrl,
     combinedSubCsvUrl,
+    holdingsXlsxUrl,
     patchCurrentStopPrice,
+    replayExecution,
+    ReplayResult,
+    brokerWrite,
+    BrokerWriteSummary,
+    ExecutionEnabledStrategy,
 } from "../services/tradelistService.ts";
 
 type Section = "holdings" | "pending" | "history";
@@ -44,6 +51,7 @@ const HoldingsAndTradesPage: React.FC = () => {
     const [strategies, setStrategies] = useState<ExecutionEnabledStrategy[]>([]);
     const [selectedId, setSelectedId] = useState<SelectedId>("");
     const [rows, setRows] = useState<TradelistRow[]>([]);
+    const [liveHoldings, setLiveHoldings] = useState<TradelistRow[]>([]);
     // Patch 43: server-resolved trade_date for the "All Systems" view.
     // null = not yet fetched / no basket data exists.
     const [basketDate, setBasketDate] = useState<string | null>(null);
@@ -52,6 +60,15 @@ const HoldingsAndTradesPage: React.FC = () => {
     const [editingRowId, setEditingRowId] = useState<number | null>(null);
     const [draftStop, setDraftStop] = useState<string>("");
     const [savingRow, setSavingRow] = useState<number | null>(null);
+    // Patch 82: date-targeted LIVE execution replay (manual stepping for debugging)
+    const [runDate, setRunDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+    const [recomputeEquity, setRecomputeEquity] = useState<boolean>(true);
+    const [replayRunning, setReplayRunning] = useState<boolean>(false);
+    const [catchingUp, setCatchingUp] = useState<boolean>(false);
+    const [replayResult, setReplayResult] = useState<ReplayResult | null>(null);
+    const [replayError, setReplayError] = useState<string | null>(null);
+    const [brokerWriting, setBrokerWriting] = useState<boolean>(false);   // Patch 84
+    const [brokerResult, setBrokerResult] = useState<BrokerWriteSummary | null>(null);   // Patch 84
 
     // Load the dropdown
     useEffect(() => {
@@ -80,6 +97,9 @@ const HoldingsAndTradesPage: React.FC = () => {
         setError(null);
         if (selectedId === "all") {
             setBasketDate(null);
+            fetchAllLiveHoldings()
+                .then(setLiveHoldings)
+                .catch(() => setLiveHoldings([]));
             fetchLatestBasketDate()
                 .then((d) => {
                     if (!d) {
@@ -141,6 +161,73 @@ const HoldingsAndTradesPage: React.FC = () => {
         }
     };
 
+    // Patch 82: run the REAL PM for one date (writes DB), then refresh the view.
+    const runReplay = async (ds: string) => {
+        if (typeof selectedId !== "number") return;
+        setReplayRunning(true);
+        setReplayError(null);
+        try {
+            const res = await replayExecution(selectedId, ds, { recomputeEquity });
+            setReplayResult(res);
+            reload();
+        } catch (e: any) {
+            const msg = e?.response?.data?.detail ?? e?.message ?? String(e);
+            setReplayError(`Replay ${ds} failed: ${msg}`);
+        } finally {
+            setReplayRunning(false);
+        }
+    };
+
+    // Patch 84: broker-write for the chosen date — the "morning" promote step.
+    // Flips that date's PROPOSED -> PENDING_FILL and PENDING_EXIT -> EXIT_SUBMITTED
+    // and writes M_Combined_{date}.xlsx. Run it for the date the orders are tagged
+    // with, then Run execution for that same date to resolve the fills.
+    const runBrokerWrite = async (ds: string) => {
+        setBrokerWriting(true);
+        setReplayError(null);
+        try {
+            const res = await brokerWrite(ds);
+            setBrokerResult(res);
+            reload();
+        } catch (e: any) {
+            const msg = e?.response?.data?.detail ?? e?.message ?? String(e);
+            setReplayError(`Broker write ${ds} failed: ${msg}`);
+        } finally {
+            setBrokerWriting(false);
+        }
+    };
+
+    // Step every weekday from runDate to today, in order. Halts on the first hard
+    // error so you stay in control while debugging (weekends are skipped client-side;
+    // a holiday with no data will surface as an error and stop the loop).
+    const catchUp = async () => {
+        if (typeof selectedId !== "number") return;
+        setCatchingUp(true);
+        setReplayError(null);
+        const end = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00");
+        let cur = new Date(runDate + "T00:00:00");
+        let lastOk: string | null = null;
+        while (cur <= end) {
+            const dow = cur.getDay();
+            if (dow !== 0 && dow !== 6) {
+                const ds = cur.toISOString().slice(0, 10);
+                try {
+                    const res = await replayExecution(selectedId, ds, { recomputeEquity });
+                    setReplayResult(res);
+                    lastOk = ds;
+                    setRunDate(ds);
+                } catch (e: any) {
+                    const msg = e?.response?.data?.detail ?? e?.message ?? String(e);
+                    setReplayError(`Stopped at ${ds}: ${msg}` + (lastOk ? ` (last good: ${lastOk})` : ""));
+                    break;
+                }
+            }
+            cur.setDate(cur.getDate() + 1);
+        }
+        setCatchingUp(false);
+        reload();
+    };
+
     const fmt = (v: number | null | undefined, d = 2) =>
         v == null ? "—" : Number(v).toFixed(d);
 
@@ -148,9 +235,9 @@ const HoldingsAndTradesPage: React.FC = () => {
         <div className="p-6 max-w-7xl mx-auto">
             <Link
                 to="/main"
-                className="inline-flex items-center text-sm text-gray-600 hover:text-indigo-600 mb-3"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold tracking-wide text-gray-400 uppercase hover:text-indigo-600 transition-colors mb-4"
             >
-                ← Back to Main
+                ← Main menu
             </Link>
             <h1 className="text-2xl font-bold text-indigo-700 mb-4">
                 Holdings & Tradelist
@@ -181,17 +268,23 @@ const HoldingsAndTradesPage: React.FC = () => {
                         Refresh
                     </button>
                 )}
-            {selectedId === "all" && basketDate && (
+            {selectedId === "all" && (
                 <div className="flex gap-2 ml-auto">
-                    
-                    <a    href={combinedBasketCsvUrl(basketDate)}
+                 <a   
+                        href={holdingsXlsxUrl()}
+                        download
+                        className="px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
+                    >
+                        ⬇ Download Holdings.xlsx
+                    </a>
+                    <a href={combinedBasketXlsxUrl(basketDate ?? new Date().toISOString().slice(0, 10))}
                         download
                         className="px-3 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
                     >
-                        ⬇ Download M_Combined.csv
+                        ⬇ Download M_Combined.xlsx
                     </a>
                     <a
-                        href={combinedSubCsvUrl(basketDate)}
+                        href={combinedSubCsvUrl(basketDate ?? new Date().toISOString().slice(0, 10))}
                         download
                         className="px-3 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700"
                     >
@@ -200,6 +293,112 @@ const HoldingsAndTradesPage: React.FC = () => {
                 </div>
             )}
             </div>
+
+            {/* Patch 82: date-targeted LIVE execution replay */}
+            {typeof selectedId === "number" && (
+                <div className="mb-6 rounded-xl border border-gray-200 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+                        <h2 className="text-sm font-semibold text-gray-800">Run execution for a date</h2>
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                            manual replay → updates tradelist
+                        </span>
+                    </div>
+                    <div className="p-4">
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <label className="text-sm font-semibold text-gray-700">Run date</label>
+                            <input
+                                type="date"
+                                value={runDate}
+                                onChange={(e) => setRunDate(e.target.value)}
+                                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+                            />
+                            <label className="text-sm text-gray-600 ml-2 flex items-center gap-1.5">
+                                <input
+                                    type="checkbox"
+                                    checked={recomputeEquity}
+                                    onChange={(e) => setRecomputeEquity(e.target.checked)}
+                                />
+                                recompute equity after
+                            </label>
+                            <button
+                                onClick={() => runReplay(runDate)}
+                                disabled={replayRunning || catchingUp || brokerWriting}
+                                className="px-4 py-1.5 text-sm font-semibold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                            >
+                                {replayRunning ? "Running…" : "Run execution"}
+                            </button>
+                            <button
+                                onClick={() => runBrokerWrite(runDate)}
+                                disabled={replayRunning || catchingUp || brokerWriting}
+                                className="px-4 py-1.5 text-sm font-semibold bg-amber-100 text-amber-800 rounded-lg hover:bg-amber-200 disabled:opacity-50"
+                                title="Promote this date's PROPOSED→PENDING_FILL and PENDING_EXIT→EXIT_SUBMITTED, and write M_Combined_{date}.xlsx"
+                            >
+                                {brokerWriting ? "Writing…" : "Broker write"}
+                            </button>
+                            <button
+                                onClick={catchUp}
+                                disabled={replayRunning || catchingUp || brokerWriting}
+                                className="px-4 py-1.5 text-sm font-semibold bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+                            >
+                                {catchingUp ? "Stepping…" : "Catch up to today →"}
+                            </button>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-3 leading-relaxed">
+                            Runs the <b>real</b> Position Manager for the chosen date (writes the DB) — the same code
+                            the nightly scheduler runs, on a date you pick. One session per run; walk forward in order.
+                            Use it to step a missed session or replay a date while debugging a backtest/execution
+                            mismatch.
+                        </p>
+
+                        {replayError && (
+                            <div className="mt-3 p-3 bg-red-50 text-red-700 rounded-lg border border-red-200 text-sm">
+                                {replayError}
+                            </div>
+                        )}
+
+                        {replayResult && (
+                            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
+                                <b>Replay {replayResult.run_date} complete.</b>{" "}
+                                {replayResult.summary.exits_applied} exits applied ·{" "}
+                                {replayResult.summary.proposed_inserted} entries proposed ·{" "}
+                                {(replayResult.summary.fills_resolved ?? 0) +
+                                    (replayResult.summary.exit_fills_resolved ?? 0)}{" "}
+                                fills resolved
+                                {replayResult.refreshed_data ? " · data refreshed" : ""}
+                                {replayResult.summary.execution_disabled && (
+                                    <div className="text-amber-700 mt-1">
+                                        ⚠ execution disabled: {replayResult.summary.execution_disable_reason}
+                                    </div>
+                                )}
+                                {replayResult.broker && (
+                                    <div className="text-xs text-green-700 mt-1">
+                                        Promoted {replayResult.broker.promoted_proposed} entries +{" "}
+                                        {replayResult.broker.exits_written} exits → wrote{" "}
+                                        {replayResult.broker.file_path?.split(/[\\/]/).pop()}
+                                    </div>
+                                )}
+                                <div className="text-xs text-green-700 mt-2">
+                                    Holdings &amp; tradelist below refreshed. Equity{" "}
+                                    {replayResult.equity && !replayResult.equity.error ? "recomputed" : "unchanged"}.
+                                </div>
+                            </div>
+                        )}
+
+                        {brokerResult && (
+                            <div className="mt-3 p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-900">
+                                <b>Broker write {brokerResult.trade_date} done.</b>{" "}
+                                Promoted {brokerResult.promoted_proposed} entries → PENDING_FILL ·{" "}
+                                {brokerResult.exits_written} exits → EXIT_SUBMITTED ·{" "}
+                                wrote M_Combined_{brokerResult.trade_date.replace(/-/g, "")}.xlsx
+                                <div className="text-xs text-amber-700 mt-1">
+                                    Those rows are now submitted. Run execution for this same date to
+                                    resolve their fills (exit/entry prices land then).
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {error && (
                 <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg border border-red-200">
@@ -211,8 +410,44 @@ const HoldingsAndTradesPage: React.FC = () => {
                 <p className="text-gray-500">Choose a strategy above to view its tradelist.</p>
             ) : loading ? (
                 <p className="text-gray-500">Loading…</p>
-            ) : selectedId === "all" ? (
-                /* ── All Systems combined basket view ─────────────────────── */
+) : selectedId === "all" ? (
+                <>
+                {/* ── All Systems combined holdings ─────────────────────── */}
+                <Section
+                    title="Holdings (LIVE) — all systems"
+                    count={liveHoldings.length}
+                >
+                    <Table>
+                        <Head>
+                            <Th>Strategy</Th><Th>Symbol</Th><Th>Dir</Th>
+                            <Th>Qty</Th><Th>Entry date</Th><Th>Entry price</Th>
+                            <Th>Initial stop</Th><Th>Current stop</Th>
+                        </Head>
+                        <tbody>
+                            {liveHoldings.length === 0 && (
+                                <tr><td colSpan={8} className="px-3 py-4 text-gray-400">
+                                    No live holdings across any execution-enabled strategy.
+                                </td></tr>
+                            )}
+                            {liveHoldings.map((r) => (
+                                <tr key={r.id} className="border-t hover:bg-gray-50">
+                                    <Td>{r.strategy_name ?? `#${r.strategy_id}`}</Td>
+                                    <Td>{r.symbol}</Td>
+                                    <Td><DirBadge dir={r.direction} /></Td>
+                                    <Td>{r.filled_qty ?? r.intended_qty}</Td>
+                                    <Td>{r.entry_date ?? "—"}</Td>
+                                    <Td>{fmt(r.entry_price)}</Td>
+                                    <Td>{fmt(r.initial_stop_price)}</Td>
+                                    <Td className={r.current_stop_price != null ? "font-semibold text-indigo-700" : "text-gray-400"}>
+                                        {r.current_stop_price != null ? fmt(r.current_stop_price) : "(recompute)"}
+                                    </Td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </Table>
+                </Section>
+
+                {/* ── All Systems combined basket view ─────────────────────── */}
                 <Section
                     title={
                         basketDate
@@ -247,6 +482,7 @@ const HoldingsAndTradesPage: React.FC = () => {
                         </tbody>
                     </Table>
                 </Section>
+                </>
             ) : (
                 /* ── Single-strategy view (existing behavior) ────────────── */
                 <>

@@ -15,7 +15,8 @@ const EodRunHistoryPage: React.FC = () => {
   const [rows, setRows] = useState<EodRunLogRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<{ status: string; step: string }>({ status: "", step: "" });
+  const today = new Date().toISOString().slice(0, 10);
+  const [filter, setFilter] = useState<{ status: string; step: string; from_date: string }>({ status: "", step: "", from_date: today });
   const [retryingId, setRetryingId] = useState<number | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [retryMsg, setRetryMsg] = useState<string | null>(null);
@@ -36,6 +37,7 @@ const EodRunHistoryPage: React.FC = () => {
     fetchEodRunLog({
       status_filter: filter.status || undefined,
       step_filter: filter.step || undefined,
+      from_date: filter.from_date || undefined,
       limit: 200,
     })
       .then(setRows)
@@ -95,9 +97,9 @@ return (
     <div className="p-6 max-w-7xl mx-auto">
       <Link
         to="/main"
-        className="inline-flex items-center text-sm text-gray-600 hover:text-indigo-600 mb-3"
+        className="inline-flex items-center gap-1.5 text-xs font-semibold tracking-wide text-gray-400 uppercase hover:text-indigo-600 transition-colors mb-4"
       >
-        ← Back to Main
+        ← Main menu
       </Link>
 
       <div className="flex items-center justify-between mb-4">
@@ -328,6 +330,21 @@ return (
           <option value="overlay_apply">overlay_apply</option>
           <option value="broker_write">broker_write</option>
         </select>
+
+        <label className="text-sm text-gray-700 ml-3">From date:</label>
+        <input
+          type="date"
+          value={filter.from_date}
+          onChange={(e) => setFilter((f) => ({ ...f, from_date: e.target.value }))}
+          className="px-2 py-1 border rounded text-sm"
+        />
+        <button
+          onClick={() => setFilter((f) => ({ ...f, from_date: "" }))}
+          className="text-xs text-gray-400 hover:text-gray-700 px-1"
+          title="Clear date filter"
+        >
+          ✕ clear
+        </button>
 
         <button
           onClick={load}

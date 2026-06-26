@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Indicator, AvailabilityRow, fetchIndicators } from "../services/indicatorService.ts";
 import { CATEGORY_COLOURS } from "../constants/uiConstants.ts";
 // mechanics:BEGIN  (revert: delete this block)
@@ -46,9 +46,11 @@ const DetailDrawer: React.FC<DrawerProps> = ({ indicator, onClose }) => {
   ];
 
   return (
-    <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
-      {/* Header */}
-      <div className="flex items-start justify-between px-5 py-4 bg-gray-50 border-b border-gray-200">
+      <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
+        {/* Back */}
+
+        {/* Header */}
+        <div className="flex items-start justify-between px-5 py-4 bg-gray-50 border-b border-gray-200">
         <div>
           <h3 className="font-semibold text-gray-800 text-base">
             {indicator.display_name}
@@ -535,15 +537,11 @@ const IndicatorsPage: React.FC = () => {
               : "Reference guide for every indicator available in the strategy builder."}
           </p>
         </div>
-        <button
-          onClick={() => navigate("/strategies")}
-          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          Back
-        </button>
+        <div className="px-5 pt-4">
+          <Link to="/main" className="inline-flex items-center gap-1.5 text-xs font-semibold tracking-wide text-gray-400 uppercase hover:text-indigo-600 transition-colors">
+            ← Main menu
+          </Link>
+        </div>
       </div>
 
       {/* mechanics:BEGIN  view toggle + branch open (revert: delete this block AND the matching close block below) */}

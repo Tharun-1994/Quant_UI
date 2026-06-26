@@ -167,8 +167,8 @@ const SystemComparePage: React.FC = () => {
     <div className="p-6 max-w-[1180px] mx-auto">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-indigo-600">System comparison</h1>
-        <Link to="/main" className="text-sm text-indigo-600 hover:underline">
-          ← Back
+        <Link to="/main" className="inline-flex items-center gap-1.5 text-xs font-semibold tracking-wide text-gray-400 uppercase hover:text-indigo-600 transition-colors">
+          ← Main menu
         </Link>
       </div>
 

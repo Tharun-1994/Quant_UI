@@ -107,3 +107,112 @@ export async function triggerNightlyTestWithCsv(
   );
   return data;
 }
+
+export interface OverlayAndWriteResponse {
+  strategy_id: number;
+  strategy_name: string;
+  override_date: string;
+  overrides_recorded: number;
+  elided: number;
+  substituted: number;
+  adjusted_capital: number;
+  half_sized: number;
+  skipped_no_match: number;
+  orders_written: number;
+  exits_written: number;
+  file_path: string;
+}
+
+export async function overlayAndWrite(
+  strategyId: number,
+  overrideDate: string,
+  csvText: string,
+  uploadedBy?: string,
+): Promise<OverlayAndWriteResponse> {
+  const { data } = await API.post<OverlayAndWriteResponse>(
+    `/eod/overlay-and-write/${strategyId}`,
+    { override_date: overrideDate, csv_text: csvText, uploaded_by: uploadedBy ?? 'ui' },
+  );
+return data;
+}
+
+export interface StrategyOverlayItem {
+  strategy_name: string;
+  csv_text: string;
+}
+
+export interface StrategyOverlayResult {
+  strategy_name: string;
+  strategy_id: number;
+  status: 'ok' | 'skipped' | 'error';
+  error?: string;
+  overrides_recorded: number;
+  elided: number;
+  substituted: number;
+  adjusted_capital: number;
+  half_sized: number;
+  skipped_no_match: number;
+}
+
+export interface OverlayAndWriteAllResponse {
+  trade_date: string;
+  strategies_run: number;
+  strategies_ok: number;
+  strategies_failed: number;
+  overlay_results: StrategyOverlayResult[];
+  orders_written: number;
+  exits_written: number;
+  file_path: string;
+}
+
+export async function overlayAndWriteAll(
+  tradeDate: string,
+  strategies: StrategyOverlayItem[],
+): Promise<OverlayAndWriteAllResponse> {
+  const { data } = await API.post<OverlayAndWriteAllResponse>(
+    '/eod/overlay-and-write-all',
+    { trade_date: tradeDate, strategies },
+  );
+    return data;
+}
+
+export async function overlayAndWriteCombined(
+  csvText: string,
+): Promise<OverlayAndWriteAllResponse> {
+  const { data } = await API.post<OverlayAndWriteAllResponse>(
+    '/eod/overlay-and-write-combined',
+    { csv_text: csvText },
+  );
+  return data;
+}
+// ── Patch 77: "Update today's prices" — append-only refresh of the static
+// backtest universes + index series to the latest posted Norgate session.
+// Backs the dashboard button. Synchronous: resolves with the per-universe /
+// per-index summary (POST /api/eod/refresh-universes-today).
+export interface UniverseRefreshItem {
+  slug?: string;        // present on universe rows
+  key?: string;         // present on index-series rows
+  status: "APPENDED" | "CURRENT" | "SKIPPED" | "ERROR";
+  last_stored?: string;
+  appended?: string[];
+  num_tickers?: number;
+  restated?: string[];
+  reason?: string;
+}
+
+export interface RefreshUniversesTodayResponse {
+  requested_end: string;
+  resolved_data_date: string;
+  today_excluded: boolean;
+  universes: UniverseRefreshItem[];
+  index: UniverseRefreshItem[];
+  restated_any: string[];
+  has_errors: boolean;
+}
+
+export async function refreshUniversesToday(): Promise<RefreshUniversesTodayResponse> {
+  const { data } = await API.post<RefreshUniversesTodayResponse>(
+    "/eod/refresh-universes-today"
+  );
+  return data;
+}
