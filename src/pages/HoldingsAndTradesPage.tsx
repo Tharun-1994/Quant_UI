@@ -178,20 +178,38 @@ const HoldingsAndTradesPage: React.FC = () => {
         }
     };
 
-    // Patch 84: broker-write for the chosen date — the "morning" promote step.
-    // Flips that date's PROPOSED -> PENDING_FILL and PENDING_EXIT -> EXIT_SUBMITTED
-    // and writes M_Combined_{date}.xlsx. Run it for the date the orders are tagged
-    // with, then Run execution for that same date to resolve the fills.
-    const runBrokerWrite = async (ds: string) => {
+// Patch 84 + 85: broker-write = the "morning" promote step. Flips PROPOSED ->
+    // PENDING_FILL and PENDING_EXIT -> EXIT_SUBMITTED and writes M_Combined_{date}.xlsx.
+    // Patch 85: target the date the pending orders ACTUALLY carry, not the picker.
+    // "Run execution for D" produces orders tagged D+1 (their execution date), so
+    // broker_write must promote D+1 — picking D in the date box promoted nothing.
+    // Read that date off the not-yet-promoted PROPOSED entries (or PENDING_EXIT
+    // exits) so the button just works regardless of the picker.
+    const runBrokerWrite = async () => {
+        const proposed = rows.find(
+            (r) => r.status === "PROPOSED" && r.intended_trade_date
+        );
+        const pendingExit = rows.find(
+            (r) => r.status === "PENDING_EXIT" && r.exit_date
+        );
+        const target =
+            proposed?.intended_trade_date ?? pendingExit?.exit_date ?? null;
+        if (!target) {
+            setReplayError(
+                "Nothing pending to promote — no PROPOSED or PENDING_EXIT rows. " +
+                "Run execution for a date first to generate orders."
+            );
+            return;
+        }
         setBrokerWriting(true);
         setReplayError(null);
         try {
-            const res = await brokerWrite(ds);
+            const res = await brokerWrite(target);
             setBrokerResult(res);
             reload();
         } catch (e: any) {
             const msg = e?.response?.data?.detail ?? e?.message ?? String(e);
-            setReplayError(`Broker write ${ds} failed: ${msg}`);
+            setReplayError(`Broker write ${target} failed: ${msg}`);
         } finally {
             setBrokerWriting(false);
         }
@@ -328,10 +346,10 @@ const HoldingsAndTradesPage: React.FC = () => {
                                 {replayRunning ? "Running…" : "Run execution"}
                             </button>
                             <button
-                                onClick={() => runBrokerWrite(runDate)}
+                                onClick={() => runBrokerWrite()}
                                 disabled={replayRunning || catchingUp || brokerWriting}
                                 className="px-4 py-1.5 text-sm font-semibold bg-amber-100 text-amber-800 rounded-lg hover:bg-amber-200 disabled:opacity-50"
-                                title="Promote this date's PROPOSED→PENDING_FILL and PENDING_EXIT→EXIT_SUBMITTED, and write M_Combined_{date}.xlsx"
+                                title="Promote the pending PROPOSED→PENDING_FILL and PENDING_EXIT→EXIT_SUBMITTED orders (uses the orders' own trade date, not the picker) and write their M_Combined.xlsx"
                             >
                                 {brokerWriting ? "Writing…" : "Broker write"}
                             </button>
