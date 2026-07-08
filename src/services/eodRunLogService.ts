@@ -41,6 +41,27 @@ export async function retryEodRunLogStep(logId: number): Promise<RetryResponse> 
   return data;
 }
 
+// Patch 112: revert the latest SUCCESS execution_step run for a strategy+date.
+export interface RevertResponse {
+  log_id: number;
+  strategy_id: number;
+  run_date: string;
+  rows_restored: number;
+  rows_recreated: number;
+  rows_deleted: number;
+  note: string;
+}
+
+export async function revertExecution(
+  strategyId: number,
+  runDate: string
+): Promise<RevertResponse> {
+  const { data } = await API.post<RevertResponse>(
+    `/eod/revert-execution?strategy_id=${strategyId}&run_date=${runDate}`
+  );
+  return data;
+}
+
 export interface TriggerResponse {
   status: string;
   pid: number;

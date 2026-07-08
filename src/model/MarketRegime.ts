@@ -72,6 +72,7 @@ export interface MarketRegime {
 
   takeprofit_type?: string;
   stoploss_pct?: number;
+  stoploss_max_pct?: number; // Patch 99: cap on ATR stop offset, % of anchor price
   stoploss_dollar?: number;
 
 
@@ -176,4 +177,11 @@ export interface VolFilter {
   vol_pct_bear: number       // 0.45 — bottom 45% excluded when SPY <= SMA200
   turnover_pct_bull: number  // 0.35
   turnover_pct_bear: number  // 0.05
+  // Patch 118: configurable regime-SMA lookback, annual recalc trigger, and
+  // avg parquet lookback. Optional — missing keys default server-side to
+  // 200 / 1 / 0 / 21 (legacy behavior).
+  spy_sma_lookback?: number  // default 200
+  trigger_month?: number     // 1=Jan .. 12=Dec, default 1
+  trigger_tdom?: number      // 0-indexed trading day of trigger_month, default 0
+  avg_lookback?: number      // rolling window for avg_volume/avg_turnover, default 21
 }

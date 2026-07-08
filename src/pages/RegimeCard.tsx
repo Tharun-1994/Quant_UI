@@ -138,11 +138,15 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate, systemType }) => {
       case "spy_volatility_pause":
         return { vol_ticker: "SPY", vol_lookback: 20, vol_median_lookback: 252, vol_multiple: 2.0 };
       case "spy_volatility":
-        return { vol_ticker: "SPY", vol_lookback: 5, vol_threshold: 0.025, timeout_days: 20,
-                 selloff_pct: 0.20, peak_drop_pct: 0.80, rearm_pct: 0.80, close_on_rearm: false };
+        return {
+          vol_ticker: "SPY", vol_lookback: 5, vol_threshold: 0.025, timeout_days: 20,
+          selloff_pct: 0.20, peak_drop_pct: 0.80, rearm_pct: 0.80, close_on_rearm: false
+        };
       case "simple":
-        return { freeze_rules_tree: makeEmptyTree(), resume_rules_tree: makeEmptyTree(),
-                 freeze_timing: "open", resume_timing: "open" };
+        return {
+          freeze_rules_tree: makeEmptyTree(), resume_rules_tree: makeEmptyTree(),
+          freeze_timing: "open", resume_timing: "open"
+        };
       default:
         return {};
     }
@@ -159,10 +163,10 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate, systemType }) => {
       return [{
         type: "simple",
         params: {
-          freeze_rules_tree:  r.freeze_rules_tree  ?? makeEmptyTree(),
-          resume_rules_tree:  r.resume_rules_tree  ?? makeEmptyTree(),
-          freeze_timing:      r.freeze_timing      || "open",
-          resume_timing:      r.resume_timing      || "open",
+          freeze_rules_tree: r.freeze_rules_tree ?? makeEmptyTree(),
+          resume_rules_tree: r.resume_rules_tree ?? makeEmptyTree(),
+          freeze_timing: r.freeze_timing || "open",
+          resume_timing: r.resume_timing || "open",
         },
       }];
     }
@@ -253,8 +257,8 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate, systemType }) => {
       // Back-compat mirror — first simple's trees & timings into regime-level fields
       freeze_rules_tree: firstSimple?.params?.freeze_rules_tree,
       resume_rules_tree: firstSimple?.params?.resume_rules_tree,
-      freeze_timing:      firstSimple?.params?.freeze_timing || "open",
-      resume_timing:      firstSimple?.params?.resume_timing || "open",
+      freeze_timing: firstSimple?.params?.freeze_timing || "open",
+      resume_timing: firstSimple?.params?.resume_timing || "open",
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [safetyNets]);
@@ -296,7 +300,7 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate, systemType }) => {
         return { title: "Edit Banned Months", maxWidth: "520px" };
       case "tdom":
         return { title: "Edit TDOM Filters", maxWidth: "720px" };
-case "vol_filter":
+      case "vol_filter":
         return { title: "Edit Vol / Turnover Filter", maxWidth: "720px" };
       // LRA Patch 38
       case "lra_classification":
@@ -327,7 +331,7 @@ case "vol_filter":
   })();
 
   // ── Risk subsection summaries ──
-// Patch 71: PORTFOLIO summary reads "PORTFOLIO · 15% · EOD · kill-switch"
+  // Patch 71: PORTFOLIO summary reads "PORTFOLIO · 15% · EOD · kill-switch"
   // so the regime card surfaces the kill-switch behaviour without opening
   // the modal. Other types unchanged.
   const stoplossSummary = (() => {
@@ -341,13 +345,17 @@ case "vol_filter":
     if (regime.stoploss_type === "ATR_BASED" && regime.atr_lookback_stp) {
       parts.push(`ATR(${regime.atr_lookback_stp})`);
     }
+    // Patch 99: show the cap on the collapsed card when configured.
+    if (regime.stoploss_type === "ATR_BASED" && regime.stoploss_max_pct) {
+      parts.push(`Cap ${regime.stoploss_max_pct}%`);
+    }
     if (regime.stoploss_type === "PORTFOLIO") {
-          // Patch 72j: include anchor in PORTFOLIO summary.
-          const anchor = regime.portfolio_stoploss_anchor || "PEAK";
-          parts.push(anchor === "DAILY" ? "daily" : "peak", "EOD", "kill-switch");
-        } else if (regime.stoploss_timing) {
-          parts.push(regime.stoploss_timing);
-        }
+      // Patch 72j: include anchor in PORTFOLIO summary.
+      const anchor = regime.portfolio_stoploss_anchor || "PEAK";
+      parts.push(anchor === "DAILY" ? "daily" : "peak", "EOD", "kill-switch");
+    } else if (regime.stoploss_timing) {
+      parts.push(regime.stoploss_timing);
+    }
     return { text: parts.join(" · "), isEmpty: false };
   })();
 
@@ -453,7 +461,7 @@ case "vol_filter":
     };
   })();
 
-return (
+  return (
     <>
       {/* LRA Patch 40 — top amber band removed; LRA tiles moved into the Rules column below Safety Nets */}
       {false && systemType === "LONGSHORT" && (
@@ -461,36 +469,36 @@ return (
           <h4 className="text-lg font-bold text-amber-800 mb-2">
             🔗 LRA Pairs Config
           </h4>
-          {(() => {     
-                // LRA Patch 40.1 — cast to any. These fields are loose JSON shapes
-                // and TS narrowing inside the sum() closure below fails on the
-                // ternary truthy checks otherwise (closures break narrowing even
-                // with const captures).
-                const tc  = regime.ticker_classification as any;
-                const per = regime.pairing_entry_rules as any;
-                const pex = regime.pairing_exit_rules as any;
-                const sp  = regime.sizing_policy as any;
-                const pep = regime.pair_exit_policy as any;
-                const trL = regime.entry_rules_tree_long as any;
-                const trS = regime.entry_rules_tree_short as any;
+          {(() => {
+            // LRA Patch 40.1 — cast to any. These fields are loose JSON shapes
+            // and TS narrowing inside the sum() closure below fails on the
+            // ternary truthy checks otherwise (closures break narrowing even
+            // with const captures).
+            const tc = regime.ticker_classification as any;
+            const per = regime.pairing_entry_rules as any;
+            const pex = regime.pairing_exit_rules as any;
+            const sp = regime.sizing_policy as any;
+            const pep = regime.pair_exit_policy as any;
+            const trL = regime.entry_rules_tree_long as any;
+            const trS = regime.entry_rules_tree_short as any;
 
             const sum = {
-              tc:  tc  ? `${Object.keys(tc).length} tickers configured`            : "Not configured",
+              tc: tc ? `${Object.keys(tc).length} tickers configured` : "Not configured",
               per: per ? `${(per.disallowed_combos || []).length} disallowed combos · swap ${per.backtracking?.swap_target ?? "—"}` : "Not configured",
               pex: pex ? `${(pex.disallowed_combos || []).length} disallowed combos` : "Not configured",
-              sp:  sp  ? `${sp.mode ?? "no mode"} · ${(sp.params?.bands || []).length} bands · ${(sp.params?.overrides || []).length} overrides` : "Not configured",
+              sp: sp ? `${sp.mode ?? "no mode"} · ${(sp.params?.bands || []).length} bands · ${(sp.params?.overrides || []).length} overrides` : "Not configured",
               pep: pep ? `Max ${pep.max_hold_sessions ?? "?"} sessions · profit ${pep.profit_exit?.enabled ? "ON" : "OFF"}` : "Not configured",
-              trL: trL ? `${(trL.children || []).length} top-level nodes`           : "Not configured",
-              trS: trS ? `${(trS.children || []).length} top-level nodes`           : "Not configured",
+              trL: trL ? `${(trL.children || []).length} top-level nodes` : "Not configured",
+              trS: trS ? `${(trS.children || []).length} top-level nodes` : "Not configured",
             };
             const tiles: Array<[string, string, () => void]> = [
-              ["Ticker Classification",     sum.tc,  () => setActiveEditor("lra_classification")],
-              ["Pairing Entry Rules",       sum.per, () => setActiveEditor("lra_pairing_entry")],
-              ["Pairing Exit Rules",        sum.pex, () => setActiveEditor("lra_pairing_exit")],
-              ["Sizing Policy",             sum.sp,  () => setActiveEditor("lra_sizing")],
-              ["Pair Exit Policy",          sum.pep, () => setActiveEditor("lra_pair_exit")],
-              ["Entry Rules Tree (Long)",   sum.trL, () => setActiveEditor("lra_tree_long")],
-              ["Entry Rules Tree (Short)",  sum.trS, () => setActiveEditor("lra_tree_short")],
+              ["Ticker Classification", sum.tc, () => setActiveEditor("lra_classification")],
+              ["Pairing Entry Rules", sum.per, () => setActiveEditor("lra_pairing_entry")],
+              ["Pairing Exit Rules", sum.pex, () => setActiveEditor("lra_pairing_exit")],
+              ["Sizing Policy", sum.sp, () => setActiveEditor("lra_sizing")],
+              ["Pair Exit Policy", sum.pep, () => setActiveEditor("lra_pair_exit")],
+              ["Entry Rules Tree (Long)", sum.trL, () => setActiveEditor("lra_tree_long")],
+              ["Entry Rules Tree (Short)", sum.trS, () => setActiveEditor("lra_tree_short")],
             ];
             return (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -544,18 +552,17 @@ return (
                       <span className="text-gray-700">
                         {selectedEtfs.length > 0
                           ? selectedEtfs
-                              .map(
-                                (key) =>
-                                  INDIVIDUAL_ETFS.find((etf) => etf.key === key)
-                                    ?.label
-                              )
-                              .join(", ")
+                            .map(
+                              (key) =>
+                                INDIVIDUAL_ETFS.find((etf) => etf.key === key)
+                                  ?.label
+                            )
+                            .join(", ")
                           : "Select ETFs..."}
                       </span>
                       <svg
-                        className={`h-4 w-4 text-gray-400 transition-transform ${
-                          isOpen ? "rotate-180" : ""
-                        }`}
+                        className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""
+                          }`}
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -626,7 +633,7 @@ return (
               />
             </div>
 
-          {/* Slots */}
+            {/* Slots */}
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">
                 Slots<span className="text-red-600">*</span>
@@ -642,7 +649,7 @@ return (
               />
             </div>
 
-{/* Patch F0: Substitute Pool Size — trader-editable.
+            {/* Patch F0: Substitute Pool Size — trader-editable.
                 Read by Position Manager (Phase C/C2) to split the engine's
                 ranked candidate list into top-N PROPOSED + next-M SUBSTITUTE_POOL.
                 0 disables substitution entirely. */}
@@ -687,10 +694,10 @@ return (
               />
             </div>
           </div>
-        </div>    
+        </div>
 
         {/* SPLIT: Risk & Portfolio Parameters (LEFT) | Rules + Timing (RIGHT) */}
-       <div className="grid grid-cols-1 lg:grid-cols-[3fr_7fr] gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[3fr_7fr] gap-6">
 
           {/* ── LEFT COLUMN: Risk & Portfolio Parameters — Option B overview cards ── */}
           <div className="pt-4 border-t lg:border-t-0 lg:pt-0">
@@ -746,7 +753,7 @@ return (
               </label>
             )}
 
-        <div className="space-y-2">
+            <div className="space-y-2">
               {/* LRA Patch 40 — Stoploss/Takeprofit replaced by Pair Exit Policy for LONGSHORT */}
               {systemType !== "LONGSHORT" && (
                 <>
@@ -770,7 +777,7 @@ return (
                 isEmpty={orderSummary.isEmpty}
                 onEdit={() => setActiveEditor("order")}
               />
-            {/* LRA Patch 40 — Ranking replaced by top_n_universe inside leg trees for LONGSHORT */}
+              {/* LRA Patch 40 — Ranking replaced by top_n_universe inside leg trees for LONGSHORT */}
               {config.features.ranking && systemType !== "LONGSHORT" && (
                 <RiskOverviewCard
                   label="Ranking"
@@ -818,7 +825,7 @@ return (
 
             <div className="space-y-3">
 
-                            {/* Market Trend Rules overview — conditional */}
+              {/* Market Trend Rules overview — conditional */}
               {config.features.marketTrendRules &&
                 (() => {
                   const s = summarizeTree(marketTrendRulesTree);
@@ -856,7 +863,7 @@ return (
                   );
                 })()}
 
-{/* Safety Nets overview (list of stateful policies) */}
+              {/* Safety Nets overview (list of stateful policies) */}
               <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
                 <div className="flex items-start justify-between gap-3 mb-2">
                   <div className="min-w-0">
@@ -880,7 +887,7 @@ return (
                     ✏ Edit
                   </button>
                 </div>
-              {safetyNets.length === 0 ? (
+                {safetyNets.length === 0 ? (
                   <p className="text-xs text-gray-700 italic">
                     No safety nets. The strategy trades freely regardless of market conditions.
                   </p>
@@ -904,45 +911,45 @@ return (
 
               {/* LRA Patch 40 — Load Defaults button + 7 LRA tiles + Preflight panel, all inside the Rules column */}
               {systemType === "LONGSHORT" && (() => {
-                const tc  = regime.ticker_classification;
+                const tc = regime.ticker_classification;
                 const per = regime.pairing_entry_rules;
                 const pex = regime.pairing_exit_rules;
-                const sp  = regime.sizing_policy;
+                const sp = regime.sizing_policy;
                 const pep = regime.pair_exit_policy;
                 const trL = regime.entry_rules_tree_long;
                 const trS = regime.entry_rules_tree_short;
                 const sum = (key: string) => {
                   switch (key) {
-                    case "classification":  return tc  ? `${Object.keys(tc).length} tickers · risk & range tier set` : "Risk & range tier for each ticker";
-                    case "tree_long":       return trL ? `Long tree configured (${(trL.children || []).length} children)` : "When to buy the long leg";
-                    case "tree_short":      return trS ? `Short tree configured (${(trS.children || []).length} children)` : "When to sell the short leg";
-                    case "pairing_entry":   return per ? `${(per.disallowed_combos || []).length} disallowed combos · swap ${per.backtracking?.swap_target ?? "—"}` : "Which long–short combos can form";
-                    case "sizing":          return sp  ? `${sp.mode ?? "no mode"} · ${(sp.params?.bands || []).length} bands` : "Dollar allocation per leg";
-                    case "pair_exit":       return pep ? `Max ${pep.max_hold_sessions ?? "?"} sessions · profit ${pep.profit_exit?.enabled ? "ON" : "OFF"}` : "When to close pairs";
-                    case "pairing_exit":    return pex ? `${(pex.disallowed_combos || []).length} disallowed combos` : "Advanced pair-exit constraints";
+                    case "classification": return tc ? `${Object.keys(tc).length} tickers · risk & range tier set` : "Risk & range tier for each ticker";
+                    case "tree_long": return trL ? `Long tree configured (${(trL.children || []).length} children)` : "When to buy the long leg";
+                    case "tree_short": return trS ? `Short tree configured (${(trS.children || []).length} children)` : "When to sell the short leg";
+                    case "pairing_entry": return per ? `${(per.disallowed_combos || []).length} disallowed combos · swap ${per.backtracking?.swap_target ?? "—"}` : "Which long–short combos can form";
+                    case "sizing": return sp ? `${sp.mode ?? "no mode"} · ${(sp.params?.bands || []).length} bands` : "Dollar allocation per leg";
+                    case "pair_exit": return pep ? `Max ${pep.max_hold_sessions ?? "?"} sessions · profit ${pep.profit_exit?.enabled ? "ON" : "OFF"}` : "When to close pairs";
+                    case "pairing_exit": return pex ? `${(pex.disallowed_combos || []).length} disallowed combos` : "Advanced pair-exit constraints";
                   }
                   return "";
                 };
                 const isEmpty = (key: string) => {
                   switch (key) {
-                    case "classification":  return !tc;
-                    case "tree_long":       return !trL;
-                    case "tree_short":      return !trS;
-                    case "pairing_entry":   return !per;
-                    case "sizing":          return !sp;
-                    case "pair_exit":       return !pep;
-                    case "pairing_exit":    return !pex;
+                    case "classification": return !tc;
+                    case "tree_long": return !trL;
+                    case "tree_short": return !trS;
+                    case "pairing_entry": return !per;
+                    case "sizing": return !sp;
+                    case "pair_exit": return !pep;
+                    case "pairing_exit": return !pex;
                   }
                   return true;
                 };
                 const tiles: Array<[string, string, string, string]> = [
-                  ["classification",  "Ticker Classification",    "📋", "Setup"],
-                  ["tree_long",       "Entry Rules Tree (Long)",  "📈", "Entry"],
-                  ["tree_short",      "Entry Rules Tree (Short)", "📉", "Entry"],
-                  ["pairing_entry",   "Pairing Entry Rules",      "🔀", "Entry"],
-                  ["sizing",          "Sizing Policy",            "💰", "Sizing"],
-                  ["pair_exit",       "Pair Exit Policy",         "🚪", "Exit"],
-                  ["pairing_exit",    "Pairing Exit Rules",       "🔀", "Exit"],
+                  ["classification", "Ticker Classification", "📋", "Setup"],
+                  ["tree_long", "Entry Rules Tree (Long)", "📈", "Entry"],
+                  ["tree_short", "Entry Rules Tree (Short)", "📉", "Entry"],
+                  ["pairing_entry", "Pairing Entry Rules", "🔀", "Entry"],
+                  ["sizing", "Sizing Policy", "💰", "Sizing"],
+                  ["pair_exit", "Pair Exit Policy", "🚪", "Exit"],
+                  ["pairing_exit", "Pairing Exit Rules", "🔀", "Exit"],
                 ];
                 const handleLoadDefaults = () => {
                   const hasAny = !!(tc || per || pex || sp || pep || trL || trS);
@@ -954,9 +961,9 @@ return (
                 };
                 const availableIndicators = Object.keys(registry || {});
                 const preflight = computeLraPreflight(regime, availableIndicators);
-                const okCount   = preflight.filter((p) => p.state === "ok").length;
+                const okCount = preflight.filter((p) => p.state === "ok").length;
                 const warnCount = preflight.filter((p) => p.state === "warn").length;
-                const errCount  = preflight.filter((p) => p.state === "err").length;
+                const errCount = preflight.filter((p) => p.state === "err").length;
                 return (
                   <>
                     <div className="flex justify-end pt-1">
@@ -969,7 +976,7 @@ return (
                       </button>
                     </div>
 
-                    {tiles.map(([key, label, icon, , ]) => (
+                    {tiles.map(([key, label, icon, ,]) => (
                       <div key={key} className="bg-gray-50 rounded-lg p-3 border flex items-center justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-bold text-gray-800">
@@ -994,18 +1001,18 @@ return (
                       <div className="flex items-center justify-between mb-2">
                         <div className="text-sm font-bold text-gray-800">✅ Pre-flight checks</div>
                         <div className="text-xs">
-                          {okCount > 0   && <span className="text-green-700 font-semibold">{okCount} passing</span>}
+                          {okCount > 0 && <span className="text-green-700 font-semibold">{okCount} passing</span>}
                           {warnCount > 0 && <span className="text-yellow-700 font-semibold ml-2">{warnCount} warning{warnCount === 1 ? "" : "s"}</span>}
-                          {errCount > 0  && <span className="text-red-700 font-semibold ml-2">{errCount} blocker{errCount === 1 ? "" : "s"}</span>}
+                          {errCount > 0 && <span className="text-red-700 font-semibold ml-2">{errCount} blocker{errCount === 1 ? "" : "s"}</span>}
                         </div>
                       </div>
                       <ul className="space-y-1">
                         {preflight.map((c, i) => (
                           <li key={i} className="flex items-start gap-2 text-xs">
                             <span className={
-                              c.state === "ok"   ? "text-green-600 font-bold" :
-                              c.state === "warn" ? "text-yellow-600 font-bold" :
-                                                   "text-red-600 font-bold"
+                              c.state === "ok" ? "text-green-600 font-bold" :
+                                c.state === "warn" ? "text-yellow-600 font-bold" :
+                                  "text-red-600 font-bold"
                             }>
                               {c.state === "ok" ? "✓" : c.state === "warn" ? "⚠" : "✗"}
                             </span>
@@ -1172,7 +1179,7 @@ return (
             tickerOptions={INDEX_TICKERS}
           />
         )}
-{activeEditor === "safety_net" && (
+        {activeEditor === "safety_net" && (
           <div className="space-y-4">
             <p className="text-sm text-gray-600">
               Add as many safety nets as you need. Each runs every day; any one
@@ -1585,25 +1592,25 @@ return (
             {(regime.stoploss_type === "NORMAL" ||
               regime.stoploss_type === "ATR_BASED" ||
               regime.stoploss_type === "PORTFOLIO") && (
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  {regime.stoploss_type === "PORTFOLIO"
-                    ? "Drawdown trigger %"
-                    : "Stoploss %"}
-                </label>
-                <input
-                  type="number"
-                  value={regime.stoploss_pct || ""}
-                  onChange={(e) =>
-                    onUpdate({ ...regime, stoploss_pct: +e.target.value })
-                  }
-                  className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-red-200"
-placeholder={
-                    regime.stoploss_type === "PORTFOLIO" ? "e.g. 15" : "e.g. 5"
-                  }
-                />
-              </div>
-            )}
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    {regime.stoploss_type === "PORTFOLIO"
+                      ? "Drawdown trigger %"
+                      : "Stoploss %"}
+                  </label>
+                  <input
+                    type="number"
+                    value={regime.stoploss_pct || ""}
+                    onChange={(e) =>
+                      onUpdate({ ...regime, stoploss_pct: +e.target.value })
+                    }
+                    className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-red-200"
+                    placeholder={
+                      regime.stoploss_type === "PORTFOLIO" ? "e.g. 15" : "e.g. 5"
+                    }
+                  />
+                </div>
+              )}
 
             {/* Patch 72i: PORTFOLIO anchor dropdown. Determines what the drop
                 is measured against — all-time peak equity or yesterday's close. */}
@@ -1666,6 +1673,31 @@ placeholder={
                   }
                   className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-red-200"
                 />
+              </div>
+            )}
+
+            {/* Patch 99: cap on ATR stop offset. Shown only for ATR_BASED. */}
+            {regime.stoploss_type === "ATR_BASED" && (
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Max Stoploss %
+                </label>
+                <input
+                  type="number"
+                  value={regime.stoploss_max_pct || ""}
+                  onChange={(e) =>
+                    onUpdate({
+                      ...regime,
+                      stoploss_max_pct: e.target.value === "" ? undefined : +e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-red-200"
+                  placeholder="e.g. 20 (blank = no cap)"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Caps the stop distance at this % of the limit/entry price when the
+                  ATR offset exceeds it. Take-profit is not capped. Blank = disabled.
+                </p>
               </div>
             )}
 
@@ -1850,20 +1882,20 @@ placeholder={
 
             {(regime.order_type === "LIMIT" ||
               regime.order_type === "LIMIT_ATR") && (
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Limit %
-                </label>
-                <input
-                  type="number"
-                  value={regime.limit_pct || ""}
-                  onChange={(e) =>
-                    onUpdate({ ...regime, limit_pct: +e.target.value })
-                  }
-                  className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-indigo-200"
-                />
-              </div>
-            )}
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
+                    Limit %
+                  </label>
+                  <input
+                    type="number"
+                    value={regime.limit_pct || ""}
+                    onChange={(e) =>
+                      onUpdate({ ...regime, limit_pct: +e.target.value })
+                    }
+                    className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-indigo-200"
+                  />
+                </div>
+              )}
 
             {regime.order_type === "LIMIT_ATR" && (
               <div>
@@ -2077,17 +2109,16 @@ placeholder={
                     onClick={() => {
                       const newMonths = isBanned
                         ? (regime.banned_months || []).filter(
-                            (m) => m !== monthNum
-                          )
+                          (m) => m !== monthNum
+                        )
                         : [...(regime.banned_months || []), monthNum];
                       onUpdate({ ...regime, banned_months: newMonths });
                     }}
                     className={`text-xs sm:text-sm font-medium px-2.5 py-1.5 rounded-full border transition 
-            ${
-              isBanned
-                ? "bg-red-100 border-red-400 text-red-700 hover:bg-red-200"
-                : "bg-white border-gray-300 text-gray-700 hover:bg-gray-100"
-            }`}
+            ${isBanned
+                        ? "bg-red-100 border-red-400 text-red-700 hover:bg-red-200"
+                        : "bg-white border-gray-300 text-gray-700 hover:bg-gray-100"
+                      }`}
                   >
                     {label}
                   </button>
@@ -2138,8 +2169,8 @@ placeholder={
                   filter.tdom != null
                     ? `tdom_${filter.tdom}`
                     : filter.weekday != null
-                    ? `wd_${filter.weekday}`
-                    : "";
+                      ? `wd_${filter.weekday}`
+                      : "";
 
                 const handleTypeChange = (val: string) => {
                   const updated = [...(regime.tdom_filters || [])];
@@ -2231,11 +2262,10 @@ placeholder={
                             key={label}
                             onClick={() => handleMonthToggle(monthNum)}
                             className={`text-xs font-medium px-2 py-1 rounded-full border transition
-                            ${
-                              active
+                            ${active
                                 ? "bg-red-100 border-red-400 text-red-700 hover:bg-red-200"
                                 : "bg-white border-gray-300 text-gray-600 hover:bg-gray-100"
-                            }`}
+                              }`}
                           >
                             {label}
                           </button>
@@ -2248,16 +2278,14 @@ placeholder={
                         Block entries on{" "}
                         <span className="font-semibold text-gray-700">
                           {selectValue.startsWith("tdom_")
-                            ? `${
-                                TDOM_LABELS[
-                                  parseInt(selectValue.split("_")[1], 10)
-                                ]
-                              } trading day`
-                            : `every ${
-                                WD_LABELS[
-                                  parseInt(selectValue.split("_")[1], 10)
-                                ]
-                              }`}{" "}
+                            ? `${TDOM_LABELS[
+                            parseInt(selectValue.split("_")[1], 10)
+                            ]
+                            } trading day`
+                            : `every ${WD_LABELS[
+                            parseInt(selectValue.split("_")[1], 10)
+                            ]
+                            }`}{" "}
                           in{" "}
                           {filter.banned_months
                             .sort((a, b) => a - b)
@@ -2276,10 +2304,15 @@ placeholder={
         {activeEditor === "vol_filter" && (
           <div>
             <div className="flex justify-between items-center mb-3">
+              {/* Patch 118: trigger caption is dynamic */}
               <p className="text-xs text-gray-500">
                 Yearly-recalculated universe-wide percentile thresholds. Entries
-                below the threshold are excluded. Triggered on the 1st January
-                trading day each year.
+                below the threshold are excluded. Triggered on trading day #
+                {(regime.vol_filter?.trigger_tdom ?? 0) + 1} of{" "}
+                {["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][
+                  (regime.vol_filter?.trigger_month ?? 1) - 1
+                ] ?? "Jan"}{" "}
+                each year (plus the first backtest day).
               </p>
               <label className="flex items-center gap-2 cursor-pointer select-none ml-3 shrink-0">
                 <span className="text-sm text-gray-600">
@@ -2291,13 +2324,18 @@ placeholder={
                     const next: VolFilter = current?.enabled
                       ? { ...current, enabled: false }
                       : {
-                          enabled: true,
-                          spy_ticker: current?.spy_ticker ?? "spy",
-                          vol_pct_bull: current?.vol_pct_bull ?? 0.2,
-                          vol_pct_bear: current?.vol_pct_bear ?? 0.45,
-                          turnover_pct_bull: current?.turnover_pct_bull ?? 0.35,
-                          turnover_pct_bear: current?.turnover_pct_bear ?? 0.05,
-                        };
+                        enabled: true,
+                        spy_ticker: current?.spy_ticker ?? "spy",
+                        vol_pct_bull: current?.vol_pct_bull ?? 0.2,
+                        vol_pct_bear: current?.vol_pct_bear ?? 0.45,
+                        turnover_pct_bull: current?.turnover_pct_bull ?? 0.35,
+                        turnover_pct_bear: current?.turnover_pct_bear ?? 0.05,
+                        // Patch 118: new configurables, legacy defaults
+                        spy_sma_lookback: current?.spy_sma_lookback ?? 200,
+                        trigger_month: current?.trigger_month ?? 1,
+                        trigger_tdom: current?.trigger_tdom ?? 0,
+                        avg_lookback: current?.avg_lookback ?? 21,
+                      };
                     onUpdate({ ...regime, vol_filter: next });
                   }}
                   className={`w-11 h-6 rounded-full transition-colors cursor-pointer flex items-center px-1
@@ -2333,7 +2371,8 @@ placeholder={
                     placeholder="spy"
                   />
                   <span className="text-xs text-gray-400">
-                    Used to compute SMA(200) for bull/bear regime detection
+                    {/* Patch 118: dynamic SMA lookback in hint */}
+                    Used to compute SMA({regime.vol_filter?.spy_sma_lookback ?? 200}) for bull/bear regime detection
                   </span>
                 </div>
 
@@ -2449,11 +2488,126 @@ placeholder={
                       </span>
                     </div>
                   </div>
+</div>
+
+                {/* Patch 118: SMA lookback, recalc trigger, avg lookback */}
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      SPY SMA Lookback
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={regime.vol_filter?.spy_sma_lookback ?? 200}
+                        onChange={(e) =>
+                          onUpdate({
+                            ...regime,
+                            vol_filter: {
+                              ...(regime.vol_filter as VolFilter),
+                              spy_sma_lookback: +e.target.value,
+                            },
+                          })
+                        }
+                        className="text-sm border rounded-lg px-2 py-1.5 w-24 focus:ring focus:ring-indigo-200"
+                      />
+                      <span className="text-xs text-gray-400">
+                        bars for bull/bear SMA
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Avg Vol/Turnover Lookback
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={regime.vol_filter?.avg_lookback ?? 21}
+                        onChange={(e) =>
+                          onUpdate({
+                            ...regime,
+                            vol_filter: {
+                              ...(regime.vol_filter as VolFilter),
+                              avg_lookback: +e.target.value,
+                            },
+                          })
+                        }
+                        className="text-sm border rounded-lg px-2 py-1.5 w-24 focus:ring focus:ring-indigo-200"
+                      />
+                      <span className="text-xs text-gray-400">
+                        rolling window (legacy 21)
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Recalc Trigger Month
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={1}
+                        max={12}
+                        step={1}
+                        value={regime.vol_filter?.trigger_month ?? 1}
+                        onChange={(e) =>
+                          onUpdate({
+                            ...regime,
+                            vol_filter: {
+                              ...(regime.vol_filter as VolFilter),
+                              trigger_month: +e.target.value,
+                            },
+                          })
+                        }
+                        className="text-sm border rounded-lg px-2 py-1.5 w-24 focus:ring focus:ring-indigo-200"
+                      />
+                      <span className="text-xs text-gray-400">
+                        1=Jan … 12=Dec
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Recalc Trigger TDOM
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={regime.vol_filter?.trigger_tdom ?? 0}
+                        onChange={(e) =>
+                          onUpdate({
+                            ...regime,
+                            vol_filter: {
+                              ...(regime.vol_filter as VolFilter),
+                              trigger_tdom: +e.target.value,
+                            },
+                          })
+                        }
+                        className="text-sm border rounded-lg px-2 py-1.5 w-24 focus:ring focus:ring-indigo-200"
+                      />
+                      <span className="text-xs text-gray-400">
+                        0 = 1st trading day
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
-<p className="text-xs text-gray-500 pt-1 border-t mt-2">
-                  CRDT_1 defaults: Vol bull=0.20, bear=0.45 · Turnover bull=0.35,
-                  bear=0.05
+                {/* Patch 118: caption corrected — actual CRDT_1 config is 0.1
+                    for all four pcts (application_phase_1.properties);
+                    previous 0.20/0.45/0.35/0.05 values were wrong. */}
+                <p className="text-xs text-gray-500 pt-1 border-t mt-2">
+                  CRDT_1 legacy values: all four pcts = 0.10 · SMA 200 · trigger
+                  Jan TDOM 0 · avg lookback 21
                 </p>
               </div>
             )}

@@ -649,7 +649,7 @@ function RuleRow({
             onChange({
               ...rule,
               indicator: selected,
-              lookback: selected === "crsi" ? 2 : (nextMeta?.defaultLookback ?? 0),
+              lookback: nextMeta?.defaultLookback ?? 0, // Patch 100: crsi hardcode removed — registry default (2) applies
               operator: selected === "month" ? "month_in" : nextIsBoolean ? "IS_TRUE" : rule.operator === "month_in" ? "" : rule.operator,
               value_type: (selected === "month" || nextIsBoolean) ? "value" : rule.value_type,
               value: nextIsBoolean ? 1 : rule.value,
@@ -740,7 +740,7 @@ function RuleRow({
               ...rule,
               indicator: selected,
 
-              lookback: selected === "crsi" ? 2 : (nextMeta?.defaultLookback ?? 0),
+              lookback: nextMeta?.defaultLookback ?? 0, // Patch 100: crsi hardcode removed — registry default (2) applies
 
               // Auto-set operator and clear stale fields for month indicator
               operator: selected === "month" ? "month_in"
