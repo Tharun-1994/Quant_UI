@@ -389,6 +389,12 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate, systemType }) => {
     if (regime.order_type === "LIMIT_ATR" && regime.atr_limit_lookback) {
       parts.push(`ATR(${regime.atr_limit_lookback})`);
     }
+    // Patch 167 v2: LIMIT_HV summary (params from limit_params json)
+    if (regime.order_type === "LIMIT_HV" && regime.limit_params?.hv_lookback) {
+      parts.push(
+        `HV(${regime.limit_params.hv_lookback})/${regime.limit_params.divider} clamp ${regime.limit_params.lower}-${regime.limit_params.upper} x${regime.limit_params.reduction}`
+      );
+    }
     if (regime.max_time) parts.push(`Max time ${regime.max_time}`);
     return { text: parts.join(" · "), isEmpty: false };
   })();
@@ -1914,6 +1920,81 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate, systemType }) => {
                   className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-indigo-200"
                 />
               </div>
+            )}
+            {/* Patch 167 v2: LIMIT_HV parameters (limit_params json) */}
+            {regime.order_type === "LIMIT_HV" && (
+              <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">HV Lookback</label>
+                <input
+                  type="number"
+                  value={regime.limit_params?.hv_lookback || ""}
+                  onChange={(e) =>
+                    onUpdate({
+                      ...regime,
+                      limit_params: { ...(regime.limit_params || {}), hv_lookback: +e.target.value },
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-indigo-200"
+                />
+              </div>
+<div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Divider</label>
+                <input
+                  type="number" step="0.1"
+                  value={regime.limit_params?.divider || ""}
+                  onChange={(e) =>
+                    onUpdate({
+                      ...regime,
+                      limit_params: { ...(regime.limit_params || {}), divider: +e.target.value },
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-indigo-200"
+                />
+              </div>
+<div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Lower %</label>
+                <input
+                  type="number" step="0.1"
+                  value={regime.limit_params?.lower || ""}
+                  onChange={(e) =>
+                    onUpdate({
+                      ...regime,
+                      limit_params: { ...(regime.limit_params || {}), lower: +e.target.value },
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-indigo-200"
+                />
+              </div>
+<div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Upper %</label>
+                <input
+                  type="number" step="0.1"
+                  value={regime.limit_params?.upper || ""}
+                  onChange={(e) =>
+                    onUpdate({
+                      ...regime,
+                      limit_params: { ...(regime.limit_params || {}), upper: +e.target.value },
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-indigo-200"
+                />
+              </div>
+<div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Reduction</label>
+                <input
+                  type="number" step="0.05"
+                  value={regime.limit_params?.reduction || ""}
+                  onChange={(e) =>
+                    onUpdate({
+                      ...regime,
+                      limit_params: { ...(regime.limit_params || {}), reduction: +e.target.value },
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-indigo-200"
+                />
+              </div>
+            </div>
             )}
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">

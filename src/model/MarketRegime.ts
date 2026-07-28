@@ -91,6 +91,8 @@ export interface MarketRegime {
   order_type?: string;
   limit_pct?: number;
   atr_limit_lookback?: number;
+  // Patch 167 v2: mode-specific limit parameters (limit_params_json)
+  limit_params?: { [key: string]: number } | null;
 
   universe?: string;
   capital?: number;

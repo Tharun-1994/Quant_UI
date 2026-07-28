@@ -76,6 +76,7 @@ export const ORDER_TYPE: Record<string, string> = {
   normal: "NORMAL",
   limit: "LIMIT",
   limit_atr: "LIMIT_ATR",
+  limit_hv: "LIMIT_HV",   // Patch 167
 };
 
 // Stoploss Type
@@ -150,6 +151,7 @@ export const MARKET_REGIME_TYPE: Record<string, string> = {
   normal: "Normal",
   simple: "Simple",
   complex: "Complex",
+  combined: "Combined",   // Patch 121: orchestration-only strategy type
 };
 
 export const INDEX_TICKERS: Record<string, string> = {
