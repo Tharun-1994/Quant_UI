@@ -8,6 +8,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Strategy } from "../model/Strategy.ts";
 import { fetchStrategyById } from "../services/strategyService.ts";
 import MarketRegimeTab from "./MarketRegimeTab.tsx";
+import DownloadTab from "./DownloadTab.tsx";
+import { STRATEGY_TABS } from "../constants/uiConstants.ts";
 
 
 interface StrategyDetailProps {
@@ -15,7 +17,7 @@ interface StrategyDetailProps {
 }
 
 const StrategyDetail: React.FC<StrategyDetailProps> = ({ mode }) => {
-  const [tab, setTab] = useState<"overview" | "marketRegime"| "equity" | "performance" | "upload">("overview");
+  const [tab, setTab] = useState<"overview" | "marketRegime"| "equity" | "performance" | "upload" | "download">("overview");
     const navigate = useNavigate();
   const { id } = useParams();
   const [strategy, setStrategy] = useState<Strategy | null>(null);
@@ -54,7 +56,7 @@ const StrategyDetail: React.FC<StrategyDetailProps> = ({ mode }) => {
 
       {/* Tabs */}
       <nav className="flex space-x-4 border-b pb-2 mb-4">
-        {["overview","marketRegime", "equity", "performance", "upload"].map((key) => (
+        {STRATEGY_TABS.map(({ key, label }) => (
           <button
             key={key}
             onClick={() => setTab(key as any)}
@@ -62,7 +64,7 @@ const StrategyDetail: React.FC<StrategyDetailProps> = ({ mode }) => {
               tab === key ? "border-b-2 border-indigo-600 text-indigo-700" : "text-gray-500"
             }`}
           >
-            {key[0].toUpperCase() + key.slice(1)}
+            {label}
           </button>
         ))}
       </nav>
@@ -72,9 +74,19 @@ const StrategyDetail: React.FC<StrategyDetailProps> = ({ mode }) => {
       {tab === "marketRegime" && strategy && (
   <MarketRegimeTab strategy={strategy} />
 )}
-      {tab === "equity" && <EquityTab strategyId={id != null ? Number(id) : 0} />}
-      {tab === "performance" && <PerformanceTab strategyId={id != null ? Number(id) : 0} />}
-      {tab === "upload" && <UploadTab />}
+      {tab === "equity" && (
+        <EquityTab strategyId={strategy?.id ?? (id != null ? Number(id) : 0)} />
+      )}
+      {tab === "performance" && (
+        <PerformanceTab strategyId={strategy?.id ?? (id != null ? Number(id) : 0)} />
+      )}
+      {/* {tab === "upload" && <UploadTab />} */}
+      {tab === "download" && strategy && (
+        <DownloadTab
+          strategyId={strategy.id ?? 0}
+          systemName={strategy.name ?? ""}
+        />
+      )}
     </div>
   );
 };
