@@ -677,6 +677,84 @@ const RegimeCard: React.FC<Props> = ({ regime, onUpdate, systemType }) => {
               />
             </div>
 
+            {/* Hold Blackout: hidden from the trader UI (kept in the engine for
+                other strategies — set the false below to true to expose it).
+                Blocks re-entry of a stock for N days after it exits; 0 disables. */}
+            {false && (<>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Hold Blackout (days after exit)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={regime.hold_blackout_days ?? ""}
+                  onChange={(e) =>
+                    onUpdate({
+                      ...regime,
+                      hold_blackout_days: e.target.value === "" ? 0 : +e.target.value,
+                    })
+                  }
+                  placeholder="0 disables"
+                  className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-blue-200"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  A stock that exits can't be re-entered for this many days. 0 = off.
+                </p>
+              </div>
+
+              {/* Hold Blackout unit */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Blackout Unit
+                </label>
+                <select
+                  value={regime.hold_blackout_unit ?? "calendar"}
+                  onChange={(e) =>
+                    onUpdate({ ...regime, hold_blackout_unit: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-blue-200"
+                >
+                  <option value="calendar">calendar days</option>
+                  <option value="trading">trading days</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  calendar: 7 = one week. trading: 5 = one week. Only used when days &gt; 0.
+                </p>
+              </div>
+            </>)}
+
+
+
+            {/* Rebalance Weekday: restrict entries to one weekday (weekly
+                rotation). "Every day" = daily rebalance. */}
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                Rebalance Weekday
+              </label>
+              <select
+                value={regime.rebalance_weekday ?? ""}
+                onChange={(e) =>
+                  onUpdate({
+                    ...regime,
+                    rebalance_weekday: e.target.value === "" ? null : +e.target.value,
+                  })
+                }
+                className="w-full px-3 py-2 border rounded-lg text-base focus:ring focus:ring-blue-200"
+              >
+                <option value="">Every day (daily)</option>
+                <option value="0">Monday</option>
+                <option value="1">Tuesday</option>
+                <option value="2">Wednesday</option>
+                <option value="3">Thursday</option>
+                <option value="4">Friday</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Entries only fire on this weekday. Holidays on that day skip the week.
+              </p>
+            </div>
+
+
             {/* Patch 59: Production Capital — per-regime live execution sizing.
                 Backtest uses `Capital` above; live nightly PM uses this value.
                 Required when the parent strategy has execution_enabled=true. */}

@@ -27,9 +27,11 @@ import API from "../config/api.ts";
 export interface IndicatorParam {
   key: string;
   label: string;
-  type: "number" | "text";
+  type: "number" | "text" | "select";
   default: number | string;
   min?: number;
+  // For type "select": the dropdown choices the trader picks from.
+  options?: (string | number)[];
 }
 
 export interface AvailabilityRow {

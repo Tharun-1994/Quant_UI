@@ -684,7 +684,7 @@ function RuleRow({
       <button type="button" onClick={onRemove} className="text-red-500 text-xs hover:underline ml-auto">Remove</button>
     </div>
     ) : (
-    <div className={`bg-white border border-gray-200 rounded-lg shadow-sm p-4 grid grid-cols-1 ${tickerOptions ? "sm:grid-cols-8" : "sm:grid-cols-6"} gap-4 items-end`}>
+    <div className={`bg-white border border-gray-200 rounded-lg shadow-sm p-4 grid grid-cols-1 ${tickerOptions ? "sm:grid-cols-8" : (meta?.params?.length ?? 0) >= 2 ? "sm:grid-cols-8" : (meta?.params?.length ?? 0) === 1 ? "sm:grid-cols-7" : "sm:grid-cols-6"} gap-4 items-end`}>
       {/* Regime Label — only for market trend rules (becomes the regime's unique key in backend).
           Hidden for month_in because calendar rules don't need a label. */}
       {tickerOptions && !isMonthIn && (
@@ -788,33 +788,49 @@ function RuleRow({
         </div>
       )}
             {/* Params (dynamic, for special indicators) */}
-      {meta?.params?.length ? (
-        <div className="sm:col-span-3 flex flex-wrap sm:flex-nowrap gap-4">
-
-          {meta.params.map((p: any) => (
-            <div key={p.key} className="min-w-[160px]">
+      {meta?.params?.length ? 
+          meta.params.map((p: any) => (
+            <div key={p.key}>
               <label className="block text-xs font-semibold text-gray-600 mb-1">
                 {p.label}
               </label>
-              <input
-                type={p.type === "number" ? "number" : "text"}
-                min={p.min}
-                value={params[p.key] ?? p.default ?? ""}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  const v = p.type === "number" ? (raw === "" ? "" : +raw) : raw;
+{p.type === "select" ? (
+                <select
+                  value={params[p.key] ?? p.default ?? ""}
+                  onChange={(e) =>
+                    onChange({
+                      ...rule,
+                      params: { ...params, [p.key]: e.target.value },
+                    })
+                  }
+                  className="w-full border px-2 py-1 rounded focus:ring focus:ring-indigo-200"
+                >
+                  {(p.options ?? []).map((opt: any) => (
+                    <option key={String(opt)} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type={p.type === "number" ? "number" : "text"}
+                  min={p.min}
+                  value={params[p.key] ?? p.default ?? ""}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    const v = p.type === "number" ? (raw === "" ? "" : +raw) : raw;
 
-                  onChange({
-                    ...rule,
-                    params: { ...params, [p.key]: v },
-                  });
-                }}
-                className="w-full border px-2 py-1 rounded focus:ring focus:ring-indigo-200"
-              />
+                    onChange({
+                      ...rule,
+                      params: { ...params, [p.key]: v },
+                    });
+                  }}
+                  className="w-full border px-2 py-1 rounded focus:ring focus:ring-indigo-200"
+                />
+              )}
             </div>
-          ))}
-        </div>
-      ) : null}
+          ))
+         : null}
 
 
       {/* Operator */}

@@ -102,6 +102,12 @@ export interface MarketRegime {
   // 0 disables substitution. Read by Position Manager (Phase C/C2) to split
   // proposedOrders into PROPOSED + SUBSTITUTE_POOL rows.
   substitute_pool_size?: number;
+  // Hold Blackout: after a stock exits, block it from re-entry for
+  // hold_blackout_days days. 0 (default) disables. hold_blackout_unit selects
+  // how the days are counted: "calendar" or "trading".
+  hold_blackout_days?: number | null;
+  hold_blackout_unit?: string | null;
+  rebalance_weekday?: number | null;
   // Patch 57: per-regime live execution sizing. Required when the parent
   // strategy has execution_enabled=true. Backtest uses `capital` above;
   // payload_builder swaps `capital` for this value at execution time.
