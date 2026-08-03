@@ -4,6 +4,7 @@ import {
   EodRunLogRow,
   fetchEodRunLog,
   retryEodRunLogStep,
+  revertExecution,          // Patch 112
   triggerNightly,
   triggerMorning,
   triggerNightlyTest, TestTriggerNightlyRequest,
@@ -75,6 +76,36 @@ const handleTrigger = async (kind: "nightly" | "morning") => {
         })
         .catch(() => {}); // non-critical — dropdown just stays empty
     }, []);
+  // Patch 112: revert the latest SUCCESS execution_step run for the row's
+  // strategy+date. Confirm first — this restores the tradelist to its
+  // pre-run state and deletes that run's PROPOSED/POOL generation.
+  const handleRevert = async (row: EodRunLogRow) => {
+    if (row.strategy_id == null) return;
+    const ok = window.confirm(
+      `Revert execution for ${row.strategy_name ?? `sid${row.strategy_id}`} ` +
+      `on ${row.run_date}?\n\nThis restores the tradelist to its state ` +
+      `BEFORE this run (fills, exits, stop/TP updates undone) and deletes ` +
+      `the proposals it created. Only the latest run per strategy can be ` +
+      `reverted. Re-run afterwards via "Run execution for a date".`
+    );
+    if (!ok) return;
+    setRetryingId(row.id);
+    setRetryMsg(null);
+    try {
+      const res = await revertExecution(row.strategy_id, row.run_date);
+      setRetryMsg(
+        `Reverted (log ${res.log_id}): ${res.rows_restored} restored, ` +
+        `${res.rows_recreated} recreated, ${res.rows_deleted} deleted. ${res.note}`
+      );
+      await load();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setRetryMsg(`Revert failed: ${msg}`);
+    } finally {
+      setRetryingId(null);
+    }
+  };
+
   const handleRetry = async (row: EodRunLogRow) => {
     setRetryingId(row.id);
     setRetryMsg(null);
@@ -420,6 +451,19 @@ return (
                           className="px-2 py-1 text-xs bg-indigo-600 text-white rounded disabled:opacity-50"
                         >
                           {retryingId === r.id ? "Retrying…" : "Retry"}
+                        </button>
+                      )}
+                      {/* Patch 112: revert — only meaningful on successful
+                          execution_step runs (journal exists per run). */}
+                      {r.step === "execution_step" &&
+                        r.status === "SUCCESS" &&
+                        r.strategy_id != null && (
+                        <button
+                          disabled={retryingId === r.id}
+                          onClick={() => handleRevert(r)}
+                          className="px-2 py-1 text-xs bg-amber-600 text-white rounded disabled:opacity-50"
+                        >
+                          {retryingId === r.id ? "Working…" : "Revert"}
                         </button>
                       )}
                     </div>

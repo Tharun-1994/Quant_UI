@@ -3,6 +3,7 @@ import { MarketRegime } from "../model/MarketRegime";
 import RegimeCard from "../pages/RegimeCard.tsx";
 import { Strategy } from "../model/Strategy.ts";
 import { fetchMarketRegimes, runBacktest, saveMarketRegime } from "../services/strategyService.ts";
+import CombinedSystem from "../pages/CombinedSystem.tsx";   // Patch 121
 
 interface MarketRegimeTabProps {
   strategy: Strategy; 
@@ -60,6 +61,10 @@ useEffect(() => {
         if (data.length > 0) {
           setRegimes(data);
           setRegimeType(data[0].regime_type); // all share same type
+} else if (strategy.market_regime_type === "Combined") {
+          // Patch 121: Combined strategies have no regimes of their own —
+          // members/allocation are configured in the Combined panel below.
+          setRegimeType("Combined");
         } else if (strategy.market_regime_type) {
           // First time → generate empty regime(s)
           generateRegimes(strategy.market_regime_type);
@@ -261,6 +266,16 @@ const handleRunBacktest = async () => {
   }
 };
 
+// Patch 121: Combined strategies render the orchestration panel
+  // (members, priorities, allocation, gate) in place of regime cards.
+  // CombinedSystem carries its own Save + Simulate buttons.
+  if (regimeType === "Combined" || strategy.market_regime_type === "Combined") {
+    return (
+      <div className="space-y-6 w-max max-w-7xl">
+        <CombinedSystem combinedId={strategy.id} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6  w-max max-w-7xl ">

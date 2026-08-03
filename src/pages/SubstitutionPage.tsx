@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   overlayAndWriteAll,
@@ -26,8 +26,9 @@ const SubstitutionPage: React.FC = () => {
   const [strategies, setStrategies] = useState<ExecutionEnabledStrategy[]>([]);
   const [selectedId, setSelectedId] = useState<string>("");
   const [tradeDate, setTradeDate] = useState<string>("");
-  const [proposed, setProposed] = useState<TradelistRow[]>([]);
-  const [subs, setSubs] = useState<TradelistRow[]>([]);
+  // Patch 102: keep ALL rows for the date; PROPOSED/SUBS derive from the
+  // selected strategy so the dropdown actually filters the two tables.
+  const [allRows, setAllRows] = useState<TradelistRow[]>([]);
   const [loadingBasket, setLoadingBasket] = useState(false);
 
   const [csvFile, setCsvFile] = useState<File | null>(null);
@@ -60,10 +61,7 @@ const SubstitutionPage: React.FC = () => {
     setLoadingBasket(true);
     setError(null);
     fetchBasketForDate(tradeDate)
-      .then((rows) => {
-        setProposed(rows.filter((r) => r.status === "PROPOSED"));
-        setSubs(rows.filter((r) => r.status === "SUBSTITUTE_POOL"));
-      })
+      .then((rows) => setAllRows(rows))
       .catch((e) => setError(`Failed to load basket: ${e.message ?? e}`))
       .finally(() => setLoadingBasket(false));
   }, [tradeDate]);
@@ -71,6 +69,27 @@ const SubstitutionPage: React.FC = () => {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Patch 102: strategy dropdown filters both tables client-side.
+  // Empty selection = all strategies (rows carry strategy_id/strategy_name).
+  const proposed = useMemo(
+    () =>
+      allRows.filter(
+        (r) =>
+          r.status === "PROPOSED" &&
+          (!selectedId || String(r.strategy_id) === selectedId)
+      ),
+    [allRows, selectedId]
+  );
+  const subs = useMemo(
+    () =>
+      allRows.filter(
+        (r) =>
+          r.status === "SUBSTITUTE_POOL" &&
+          (!selectedId || String(r.strategy_id) === selectedId)
+      ),
+    [allRows, selectedId]
+  );
 
 // Single combined CSV file
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,7 +146,7 @@ const SubstitutionPage: React.FC = () => {
             onChange={(e) => setSelectedId(e.target.value)}
             className="border rounded px-3 py-2 text-sm min-w-[220px]"
           >
-            <option value="">Select strategy</option>
+            <option value="">All strategies</option>
             {strategies.map((s) => (
               <option key={s.id} value={String(s.id)}>
                 {s.name}

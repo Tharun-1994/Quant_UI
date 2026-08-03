@@ -72,6 +72,7 @@ export interface MarketRegime {
 
   takeprofit_type?: string;
   stoploss_pct?: number;
+  stoploss_max_pct?: number; // Patch 99: cap on ATR stop offset, % of anchor price
   stoploss_dollar?: number;
 
 
@@ -90,6 +91,8 @@ export interface MarketRegime {
   order_type?: string;
   limit_pct?: number;
   atr_limit_lookback?: number;
+  // Patch 167 v2: mode-specific limit parameters (limit_params_json)
+  limit_params?: { [key: string]: number } | null;
 
   universe?: string;
   capital?: number;
@@ -99,6 +102,12 @@ export interface MarketRegime {
   // 0 disables substitution. Read by Position Manager (Phase C/C2) to split
   // proposedOrders into PROPOSED + SUBSTITUTE_POOL rows.
   substitute_pool_size?: number;
+  // Hold Blackout: after a stock exits, block it from re-entry for
+  // hold_blackout_days days. 0 (default) disables. hold_blackout_unit selects
+  // how the days are counted: "calendar" or "trading".
+  hold_blackout_days?: number | null;
+  hold_blackout_unit?: string | null;
+  rebalance_weekday?: number | null;
   // Patch 57: per-regime live execution sizing. Required when the parent
   // strategy has execution_enabled=true. Backtest uses `capital` above;
   // payload_builder swaps `capital` for this value at execution time.
@@ -176,4 +185,11 @@ export interface VolFilter {
   vol_pct_bear: number       // 0.45 — bottom 45% excluded when SPY <= SMA200
   turnover_pct_bull: number  // 0.35
   turnover_pct_bear: number  // 0.05
+  // Patch 118: configurable regime-SMA lookback, annual recalc trigger, and
+  // avg parquet lookback. Optional — missing keys default server-side to
+  // 200 / 1 / 0 / 21 (legacy behavior).
+  spy_sma_lookback?: number  // default 200
+  trigger_month?: number     // 1=Jan .. 12=Dec, default 1
+  trigger_tdom?: number      // 0-indexed trading day of trigger_month, default 0
+  avg_lookback?: number      // rolling window for avg_volume/avg_turnover, default 21
 }
